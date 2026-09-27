@@ -1,271 +1,169 @@
 import React from 'react';
-import { UserProfile, SwapRequest } from '../types';
+import { UserProfile, LearningSession } from '../types';
 import { ALL_MITS_BRANCHES } from '../data/mitsBranches';
+import { getBadgeById } from '../services/badgeService';
 import {
-  CheckCircle2,
-  Star,
-  Clock,
-  MessageSquare,
-  ArrowRightLeft,
-  Sparkles,
-  Lock,
-  MessageCircle,
-  Video,
-  Check,
-  X
+  Star, CheckCircle2, ArrowRightLeft, MessageCircle, Video,
+  Clock, BookOpen, Award, Check, X
 } from 'lucide-react';
 
 interface PeerCardProps {
   peer: UserProfile;
   currentUserId: string;
-  activeRequest?: SwapRequest;
-  onViewReviews: (peer: UserProfile) => void;
-  onInitiateSwap: (peer: UserProfile) => void;
-  onOpenChat: (request: SwapRequest) => void;
-  onStartVideo: (request: SwapRequest) => void;
+  activeSession?: LearningSession;
+  activeRequest?: LearningSession;
+  onViewProfile?: (peer: UserProfile) => void;
+  onViewReviews?: (peer: UserProfile) => void;
+  onRequestSession?: (peer: UserProfile) => void;
+  onInitiateSwap?: (peer: UserProfile) => void;
+  onOpenChat?: (session: any) => void;
+  onStartVideo?: (session: any) => void;
+  onAcceptSession?: (sessionId: string) => void;
   onAcceptRequest?: (requestId: string) => void;
+  onDeclineSession?: (sessionId: string) => void;
   onDeclineRequest?: (requestId: string) => void;
 }
 
 export const PeerCard: React.FC<PeerCardProps> = ({
   peer,
   currentUserId,
+  activeSession,
   activeRequest,
+  onViewProfile,
   onViewReviews,
+  onRequestSession,
   onInitiateSwap,
   onOpenChat,
   onStartVideo,
+  onAcceptSession,
   onAcceptRequest,
+  onDeclineSession,
   onDeclineRequest,
 }) => {
-  const isPending = activeRequest?.status === 'pending';
-  const isAccepted = activeRequest?.status === 'accepted';
-  const isSentByMe = activeRequest?.fromUserId === currentUserId;
-  const isReceivedByMe = activeRequest?.toUserId === currentUserId;
+  const session = activeSession || activeRequest;
+  const handleView = onViewProfile || onViewReviews || (() => {});
+  const handleRequest = onRequestSession || onInitiateSwap || (() => {});
+  const handleAccept = onAcceptSession || onAcceptRequest || (() => {});
+  const handleDecline = onDeclineSession || onDeclineRequest || (() => {});
+
+  const branchCode = ALL_MITS_BRANCHES.find((b) => b.value === peer.department)?.code || peer.department;
+
+  const isIncomingRequest = session && ((session.status === 'requested' || (session.status as any) === 'pending') && (session.trainerId === currentUserId || session.toUserId === currentUserId));
+  const isOutgoingRequest = session && ((session.status === 'requested' || (session.status as any) === 'pending') && (session.traineeId === currentUserId || session.fromUserId === currentUserId));
+  const isConnected = session && (session.status === 'accepted' || session.status === 'active');
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between overflow-hidden group">
-      {/* Card Header: Avatar, Name, MITS Gwalior Badge */}
-      <div className="p-5">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center space-x-3">
-            <div
-              onClick={() => onViewReviews(peer)}
-              className="relative cursor-pointer"
-              title="Click to view peer reviews & teaching history"
-            >
-              <img
-                src={peer.avatar}
-                alt={peer.name}
-                referrerPolicy="no-referrer"
-                className="w-13 h-13 rounded-full object-cover ring-2 ring-slate-100 group-hover:ring-sky-500/40 transition-all"
-              />
-              {peer.verified && (
-                <div
-                  className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-xs"
-                  title="Verified MITS/Campus Peer"
-                >
-                  <CheckCircle2 className="w-4 h-4 text-sky-500 fill-sky-500" />
-                </div>
+    <div className="bg-white dark:bg-[#0D1B2A] rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden hover:shadow-lg dark:hover:shadow-black/50 hover:-translate-y-0.5 transition-all duration-200 group">
+      {/* Header */}
+      <div className="p-4">
+        <div className="flex items-center space-x-3">
+          <div className="relative shrink-0 cursor-pointer" onClick={() => handleView(peer)}>
+            <img
+              src={peer.avatar}
+              alt={peer.name}
+              referrerPolicy="no-referrer"
+              className="w-12 h-12 rounded-full object-cover ring-2 ring-slate-200 dark:ring-slate-700 group-hover:ring-sky-400 dark:group-hover:ring-teal-400 transition-all"
+            />
+            {peer.verified && (
+              <div className="absolute -bottom-0.5 -right-0.5 bg-white dark:bg-[#0D1B2A] rounded-full p-0.5 shadow-2xs">
+                <CheckCircle2 className="w-3.5 h-3.5 text-sky-500 dark:text-teal-400 fill-sky-500 dark:fill-teal-400" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onViewProfile(peer)}>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate group-hover:text-sky-600 dark:group-hover:text-teal-400 transition-colors">{peer.name}</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">{branchCode} • {peer.year}</p>
+            <div className="flex items-center space-x-2 mt-1">
+              <span className="inline-flex items-center text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800/60">
+                <Star className="w-3 h-3 text-amber-500 fill-amber-500 mr-0.5" />
+                {peer.averageRating.toFixed(1)}
+              </span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500">{peer.completedSessions} sessions</span>
+            </div>
+          </div>
+          {/* Badges preview */}
+          {peer.badges.length > 0 && (
+            <div className="flex -space-x-1">
+              {peer.badges.slice(0, 3).map((b) => {
+                const def = getBadgeById(b.badgeId);
+                return def ? (
+                  <span key={b.badgeId} className="text-sm" title={def.name}>{def.icon}</span>
+                ) : null;
+              })}
+              {peer.badges.length > 3 && (
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold ml-1">+{peer.badges.length - 3}</span>
               )}
             </div>
-
-            <div>
-              <div className="flex items-center space-x-1.5">
-                <h3
-                  onClick={() => onViewReviews(peer)}
-                  className="text-sm sm:text-base font-bold text-slate-900 hover:text-sky-600 transition-colors cursor-pointer"
-                >
-                  {peer.name}
-                </h3>
-              </div>
-
-              {/* Strictly Locked to "MITS Gwalior" */}
-              <div className="flex items-center space-x-1.5 mt-0.5">
-                <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
-                  MITS Gwalior
-                </span>
-                <span className="text-[11px] text-slate-400 font-medium">
-                  {ALL_MITS_BRANCHES.find((b) => b.value === peer.department)?.code || peer.department} • {peer.year}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Rating Badge */}
-          <button
-            type="button"
-            onClick={() => onViewReviews(peer)}
-            className="flex items-center space-x-1 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-lg border border-amber-200 transition-colors cursor-pointer"
-            title="Inspect peer feedback reviews"
-          >
-            <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-            <span className="text-xs font-bold text-amber-900 font-mono">
-              {peer.averageRating.toFixed(1)}
-            </span>
-          </button>
+          )}
         </div>
+      </div>
 
-        {/* Peer Bio */}
-        <p className="text-xs text-slate-600 mt-3 line-clamp-2 leading-relaxed">
-          {peer.bio}
-        </p>
-
-        {/* Aggregate Peer Performance Metrics */}
-        <div className="grid grid-cols-3 gap-2 mt-4 py-2 px-3 bg-slate-50/80 rounded-xl border border-slate-100 text-center">
-          <div>
-            <span className="text-xs font-bold text-slate-800 font-mono">{peer.hoursTaught}</span>
-            <p className="text-[10px] text-slate-400 font-medium">Hours Taught</p>
-          </div>
-          <div className="border-x border-slate-200">
-            <span className="text-xs font-bold text-slate-800 font-mono">{peer.hoursLearned}</span>
-            <p className="text-[10px] text-slate-400 font-medium">Hours Learned</p>
-          </div>
-          <div>
-            <span className="text-xs font-bold text-slate-800 font-mono">{peer.reviews.length}</span>
-            <p className="text-[10px] text-slate-400 font-medium">Reviews Logged</p>
-          </div>
-        </div>
-
-        {/* Skills Offered Matrix */}
-        <div className="mt-4">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Can Teach
-            </span>
-            <span className="text-[10px] text-sky-600 font-semibold">Skill Offered</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {peer.skillsOffered.map((skill) => (
-              <span
-                key={skill}
-                className="text-[11px] font-semibold text-sky-800 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-200/80"
-              >
-                {skill}
-              </span>
+      {/* Skills */}
+      <div className="px-4 pb-3 space-y-2">
+        <div>
+          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Can Teach</span>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {peer.skillsOffered.slice(0, 3).map((s) => (
+              <span key={s} className="text-[10px] font-semibold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 px-2 py-0.5 rounded-full border border-sky-200/80 dark:border-sky-800/60">{s}</span>
             ))}
           </div>
         </div>
-
-        {/* Skills Wanted Matrix */}
-        <div className="mt-3">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Wants To Learn
-            </span>
-            <span className="text-[10px] text-teal-600 font-semibold">Skill Wanted</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {peer.skillsWanted.map((skill) => (
-              <span
-                key={skill}
-                className="text-[11px] font-semibold text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200/80"
-              >
-                {skill}
-              </span>
+        <div>
+          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Wants to Learn</span>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {peer.skillsWanted.slice(0, 3).map((s) => (
+              <span key={s} className="text-[10px] font-semibold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/40 px-2 py-0.5 rounded-full border border-teal-200/80 dark:border-teal-800/60">{s}</span>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Card Action Footer with Lifecycle State Control */}
-      <div className="p-4 bg-slate-50/70 border-t border-slate-100 flex flex-col space-y-2">
-        {/* Pre-Swap Inspection Link */}
-        <div className="flex items-center justify-between text-xs">
-          <button
-            type="button"
-            onClick={() => onViewReviews(peer)}
-            className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 flex items-center transition-colors cursor-pointer"
-          >
-            <MessageSquare className="w-3.5 h-3.5 mr-1 text-slate-400" />
-            Inspect Teaching Reviews ({peer.reviews.length})
-          </button>
-        </div>
-
-        {/* Dynamic Action State (Instagram Follow Request Style) */}
-        {isAccepted && activeRequest ? (
-          /* Connected & Unlocked: Chat & Video Session Available */
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-center justify-between text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/80">
-              <span className="font-semibold flex items-center">
-                <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-                Connected Swapper
-              </span>
-              <span className="text-[10px] text-emerald-600">
-                {activeRequest.skillOffered} ⇄ {activeRequest.skillWanted}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => onOpenChat(activeRequest)}
-                className="py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center space-x-1.5 shadow-2xs transition-all cursor-pointer"
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span>Chat</span>
+      {/* Action Area */}
+      <div className="px-4 pb-4 pt-1">
+        {isIncomingRequest && session ? (
+          <div className="space-y-2">
+            <p className="text-[11px] text-amber-700 dark:text-amber-300 font-semibold bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-800/60 text-center">
+              📩 Wants to learn <strong>{session.skill || session.skillWanted}</strong> from you
+            </p>
+            <div className="flex space-x-2">
+              <button type="button" onClick={() => handleAccept(session.id)}
+                className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center space-x-1">
+                <Check className="w-3.5 h-3.5" /><span>Accept</span>
               </button>
-
-              <button
-                type="button"
-                onClick={() => onStartVideo(activeRequest)}
-                className="py-2 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center space-x-1.5 shadow-2xs transition-all cursor-pointer"
-              >
-                <Video className="w-3.5 h-3.5" />
-                <span>Video Call</span>
+              <button type="button" onClick={() => handleDecline(session.id)}
+                className="flex-1 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center space-x-1">
+                <X className="w-3.5 h-3.5" /><span>Decline</span>
               </button>
             </div>
           </div>
-        ) : isPending && isReceivedByMe && activeRequest ? (
-          /* Incoming Request: Instagram-style "Confirm" and "Delete" */
-          <div className="space-y-1.5 pt-1">
-            <div className="text-[11px] text-sky-800 bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200/80 font-medium">
-              Requested to swap: <span className="font-bold">{activeRequest.skillOffered}</span> for your <span className="font-bold">{activeRequest.skillWanted}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => onAcceptRequest?.(activeRequest.id)}
-                className="py-2 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center space-x-1.5 shadow-2xs transition-all cursor-pointer"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>Confirm</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onDeclineRequest?.(activeRequest.id)}
-                className="py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 text-xs font-semibold flex items-center justify-center space-x-1 transition-all cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-                <span>Delete</span>
-              </button>
-            </div>
+        ) : isOutgoingRequest ? (
+          <div className="py-2 text-center text-[11px] text-sky-600 dark:text-sky-300 font-bold bg-sky-50 dark:bg-sky-950/40 rounded-lg border border-sky-200 dark:border-sky-800/60">
+            ⏳ Session Request Sent
           </div>
-        ) : isPending && isSentByMe && activeRequest ? (
-          /* Sent Request: Instagram-style "Requested" state with Cancel option */
-          <div className="flex items-center space-x-2 pt-1">
-            <div className="flex-1 py-2 px-3 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center space-x-1.5 select-none">
-              <Clock className="w-3.5 h-3.5 text-slate-500 animate-spin-slow" />
-              <span>Requested</span>
+        ) : isConnected && session ? (
+          <div className="space-y-2">
+            <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60 text-center">
+              ✅ Connected — Session #{session.sessionNumber || 1}: {session.skill || session.skillWanted}
+            </p>
+            <div className="flex space-x-2">
+              <button type="button" onClick={() => onOpenChat?.(session)}
+                className="flex-1 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center space-x-1">
+                <MessageCircle className="w-3.5 h-3.5" /><span>Chat</span>
+              </button>
+              <button type="button" onClick={() => onStartVideo?.(session)}
+                className="flex-1 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center space-x-1">
+                <Video className="w-3.5 h-3.5" /><span>Video</span>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => onDeclineRequest?.(activeRequest.id)}
-              className="py-2 px-2.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-medium transition-colors cursor-pointer"
-              title="Cancel Swap Request"
-            >
-              Cancel
-            </button>
           </div>
         ) : (
-          /* Initial State: Instagram-style "Request Swap" */
           <button
             type="button"
-            onClick={() => onInitiateSwap(peer)}
-            className="w-full py-2.5 px-4 rounded-lg bg-sky-600 hover:bg-sky-700 active:scale-[0.99] text-white text-xs font-bold flex items-center justify-center space-x-1.5 shadow-2xs transition-all cursor-pointer"
+            onClick={() => handleRequest(peer)}
+            className="w-full py-2 bg-slate-900 hover:bg-slate-800 dark:bg-teal-600 dark:hover:bg-teal-500 text-white rounded-lg text-xs font-bold shadow-xs transition-all duration-150 cursor-pointer flex items-center justify-center space-x-1.5 focus:ring-2 focus:ring-teal-400 focus:outline-hidden"
           >
-            <ArrowRightLeft className="w-3.5 h-3.5" />
-            <span>Request Swap</span>
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Request Learning Session</span>
           </button>
         )}
       </div>

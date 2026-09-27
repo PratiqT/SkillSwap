@@ -1,284 +1,187 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SwapRequest, ChatMessage } from '../types';
+import { ChatMessage, LearningSession, UserProfile } from '../types';
+import { checkMessage } from '../services/moderationService';
 import {
-  X,
-  Send,
-  Smile,
-  Video,
-  CheckCheck,
-  Sparkles,
-  Heart,
-  Flame,
-  ThumbsUp
+  X, Send, Smile, ArrowLeft, Paperclip, Video
 } from 'lucide-react';
 
 interface ChatModuleProps {
-  request: SwapRequest;
+  session?: LearningSession;
+  request?: LearningSession;
+  currentUser?: UserProfile;
+  currentUserId?: string;
   messages: ChatMessage[];
-  currentUserId: string;
   onSendMessage: (text: string) => void;
-  onStartVideoCall: () => void;
+  onFlagMessage?: (category: string, severity: string, messageContent: string) => void;
+  onStartVideo?: () => void;
+  onStartVideoCall?: () => void;
+  onCompleteSession?: () => void;
   onClose: () => void;
 }
 
-const QUICK_EMOJIS = ['❤️', '😂', '🔥', '👍', '👏', '🚀', '💡', '💯', '🥳', '☕'];
-
-const EMOJI_CATEGORIES = [
-  {
-    name: 'Smileys',
-    emojis: [
-      '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃',
-      '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😋', '😛', '😜',
-      '🤪', '😎', '🤓', '🥳', '🤠', '🥺', '😴', '🤯', '🤫', '🤗'
-    ],
-  },
-  {
-    name: 'Gestures',
-    emojis: [
-      '👍', '👎', '👏', '🙌', '👐', '🤲', '🤝', '🤜', '🤛', '✊',
-      '👊', '✌️', '🤞', '🤟', '🤘', '👌', '🤌', '🤙', '👋', '🙏'
-    ],
-  },
-  {
-    name: 'Tech & Study',
-    emojis: [
-      '💻', '🖥️', '📱', '📚', '📖', '📝', '✏️', '💡', '🧠', '⚡',
-      '🚀', '🎯', '🏆', '🎓', '🔬', '🔭', '📐', '📊', '📈', '💾'
-    ],
-  },
-  {
-    name: 'Fun & Life',
-    emojis: [
-      '☕', '🍕', '🍔', '🍿', '🎸', '🎨', '⚽', '🏀', '🎮', '🎧',
-      '🎬', '📸', '⏰', '📅', '📌', '🔑', '💎', '❤️', '💖', '✨'
-    ],
-  },
-];
+const EMOJI_PANELS: Record<string, string[]> = {
+  '😊': ['😊', '😂', '🙏', '❤️', '🔥', '👍', '👏', '💯', '🎉', '✨'],
+  '📚': ['📚', '💡', '✅', '📝', '🎯', '🧠', '⚡', '🚀', '💻', '🔍'],
+  '👋': ['👋', '🤝', '✌️', '🫡', '💪', '👀', '🤔', '😎', '🤗', '😅'],
+};
 
 export const ChatModule: React.FC<ChatModuleProps> = ({
+  session,
   request,
-  messages,
+  currentUser,
   currentUserId,
+  messages,
   onSendMessage,
+  onFlagMessage,
+  onStartVideo,
   onStartVideoCall,
+  onCompleteSession,
   onClose,
 }) => {
-  const [inputText, setInputText] = useState('');
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [activeCategory, setActiveCategory] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [text, setText] = useState('');
+  const [showEmojis, setShowEmojis] = useState(false);
+  const [emojiTab, setEmojiTab] = useState('😊');
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  const peerName = request.fromUserId === currentUserId ? request.toUserName : request.fromUserName;
-  const peerAvatar = request.fromUserId === currentUserId ? request.toUserAvatar : request.fromUserAvatar;
+  const actualSession = session || request;
+  const activeUserId = currentUserId || currentUser?.id || '';
+  const isTrainer = (actualSession?.trainerId && actualSession.trainerId === activeUserId) || (actualSession?.fromUserId === activeUserId);
+  const peerName = isTrainer
+    ? (actualSession?.traineeName || actualSession?.toUserName || 'Peer')
+    : (actualSession?.trainerName || actualSession?.fromUserName || 'Peer');
+  const peerAvatar = isTrainer
+    ? (actualSession?.traineeAvatar || actualSession?.toUserAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150')
+    : (actualSession?.trainerAvatar || actualSession?.fromUserAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150');
+  const sessionNumber = actualSession?.sessionNumber ?? 1;
+  const sessionSkill = actualSession?.skill || actualSession?.skillWanted || actualSession?.skillOffered || 'Skill Swap';
 
-  // Auto scroll to bottom on new message
+  const handleVideo = onStartVideo || onStartVideoCall || (() => {});
+  const handleComplete = onCompleteSession || onClose;
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inputText.trim()) return;
-    onSendMessage(inputText.trim());
-    setInputText('');
-    setShowEmojiPicker(false);
+  const handleSend = () => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    // Moderation check
+    const result = checkMessage(trimmed);
+    if (result.flagged && onFlagMessage) {
+      onFlagMessage(result.category, result.severity, trimmed);
+    }
+
+    onSendMessage(trimmed);
+    setText('');
+    setShowEmojis(false);
   };
 
-  const handleAddEmoji = (emoji: string) => {
-    setInputText((prev) => prev + emoji);
-    inputRef.current?.focus();
-  };
-
-  const handleQuickSendEmoji = (emoji: string) => {
-    onSendMessage(emoji);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-xl h-[85vh] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
-        {/* Instagram / WhatsApp-Style Header */}
-        <div className="bg-slate-900 text-white px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="relative">
-              <img
-                src={peerAvatar}
-                alt={peerName}
-                referrerPolicy="no-referrer"
-                className="w-10 h-10 rounded-full object-cover ring-1 ring-white/30"
-              />
-              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-slate-900" />
-            </div>
-
-            <div>
-              <div className="flex items-center space-x-1.5">
-                <h3 className="text-sm font-bold text-white">{peerName}</h3>
-                <span className="text-[9px] font-bold bg-sky-900/90 text-sky-200 px-1.5 py-0.2 rounded">
-                  MITS Gwalior
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300">
-                Swapping: {request.skillOffered} ⇄ {request.skillWanted}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-1">
-            <button
-              type="button"
-              onClick={onStartVideoCall}
-              className="p-2 text-slate-200 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
-              title="Launch 1-on-1 Jitsi Video Session"
-            >
-              <Video className="w-5 h-5 text-emerald-400" />
-            </button>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
-              title="Close chat"
-            >
-              <X className="w-5 h-5" />
-            </button>
+    <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-[#07111F] transition-colors">
+      {/* Chat Header */}
+      <div className="w-full bg-white dark:bg-[#0D1B2A] border-b border-slate-200 dark:border-white/10 px-3 py-2.5 flex items-center justify-between shrink-0">
+        <div className="flex items-center space-x-3">
+          <button type="button" onClick={onClose} className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <img src={peerAvatar} alt={peerName} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-700" />
+          <div>
+            <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">{peerName}</h4>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+              Session #{sessionNumber} • {sessionSkill} •
+              <span className={isTrainer ? ' text-teal-600 dark:text-teal-400' : ' text-sky-600 dark:text-sky-400'}> {isTrainer ? 'You\'re Teaching' : 'You\'re Learning'}</span>
+            </p>
           </div>
         </div>
-
-        {/* Chat Body */}
-        <div className="flex-1 bg-[#efeae2]/40 p-4 overflow-y-auto space-y-3">
-          {/* Security & Campus Notification Banner */}
-          <div className="flex justify-center">
-            <div className="bg-amber-50/90 border border-amber-200/80 rounded-lg px-3 py-1 text-[11px] text-amber-800 font-medium text-center shadow-2xs max-w-sm">
-              🔒 Peer-to-peer encrypted session between MITS students.
-            </div>
-          </div>
-
-          {messages.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 text-xs">
-              Say hello! Tap emojis below, coordinate your skill barter session, or tap the video camera above for your live session.
-            </div>
-          ) : (
-            messages.map((msg) => {
-              const isSender = msg.isMe;
-              return (
-                <div
-                  key={msg.id}
-                  className={`flex flex-col ${isSender ? 'items-end' : 'items-start'}`}
-                >
-                  <div
-                    className={`max-w-[78%] px-3.5 py-2 rounded-2xl shadow-xs text-xs relative ${
-                      isSender
-                        ? 'bg-[#d9fdd3] text-slate-900 rounded-tr-none'
-                        : 'bg-white text-slate-900 rounded-tl-none border border-slate-200/70'
-                    }`}
-                  >
-                    <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                    <div className="flex items-center justify-end space-x-1 mt-1 text-[9px] text-slate-500">
-                      <span>{msg.timestamp}</span>
-                      {isSender && <CheckCheck className="w-3 h-3 text-sky-600" />}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-          <div ref={messagesEndRef} />
+        <div className="flex items-center space-x-1.5">
+          <button type="button" onClick={handleVideo} className="p-2 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer" title="Start Video">
+            <Video className="w-4 h-4" />
+          </button>
+          <button type="button" onClick={handleComplete}
+            className="px-2.5 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 cursor-pointer">
+            Complete Session
+          </button>
         </div>
+      </div>
 
-        {/* 1-Tap Quick Emoji Bar (Instagram DM style) */}
-        <div className="bg-slate-50 border-t border-slate-200/80 px-3 py-1.5 flex items-center justify-between overflow-x-auto gap-1">
-          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider shrink-0 mr-1">
-            Quick:
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2 bg-gradient-to-b from-slate-50 to-white dark:from-[#07111F] dark:to-[#0D1B2A]">
+        {/* Session start indicator */}
+        <div className="text-center mb-3">
+          <span className="text-[10px] bg-sky-100 dark:bg-teal-950/60 text-sky-700 dark:text-teal-300 px-3 py-1 rounded-full font-semibold border border-sky-200 dark:border-teal-800/60">
+            Session #{sessionNumber} — {sessionSkill}
           </span>
-          <div className="flex items-center space-x-1">
-            {QUICK_EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => handleAddEmoji(emoji)}
-                className="text-base hover:scale-125 active:scale-95 transition-transform p-1 rounded-md hover:bg-slate-200/70 cursor-pointer"
-                title={`Add ${emoji}`}
-              >
-                {emoji}
+        </div>
+
+        {messages.map((msg) => (
+          <div key={msg.id} className={`flex ${msg.isMe ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-xs leading-relaxed ${
+              msg.flagged
+                ? 'bg-rose-100 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
+                : msg.isMe
+                ? 'bg-slate-900 dark:bg-teal-600 text-white rounded-br-md shadow-xs'
+                : 'bg-white dark:bg-[#122337] border border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-100 rounded-bl-md shadow-xs'
+            }`}>
+              {msg.flagged && (
+                <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 block mb-1">⚠️ Flagged: {msg.flagReason}</span>
+              )}
+              {msg.text}
+              <span className={`text-[10px] block mt-1 ${msg.isMe ? 'text-slate-400 dark:text-teal-100/70' : 'text-slate-400 dark:text-slate-400'}`}>
+                {msg.timestamp}
+              </span>
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Emoji Drawer */}
+      {showEmojis && (
+        <div className="border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#0D1B2A] px-3 py-2">
+          <div className="flex space-x-3 mb-2 border-b border-slate-100 dark:border-white/10 pb-1">
+            {Object.keys(EMOJI_PANELS).map((tab) => (
+              <button key={tab} type="button" onClick={() => setEmojiTab(tab)}
+                className={`text-lg cursor-pointer ${emojiTab === tab ? 'scale-110' : 'opacity-50'}`}>
+                {tab}
               </button>
             ))}
           </div>
-        </div>
-
-        {/* Expanded Categorized Emoji Drawer */}
-        {showEmojiPicker && (
-          <div className="bg-white border-t border-slate-200 flex flex-col max-h-48 animate-in slide-in-from-bottom-2 duration-150 shadow-inner">
-            {/* Category Tabs */}
-            <div className="flex border-b border-slate-100 bg-slate-50 text-[11px] font-semibold">
-              {EMOJI_CATEGORIES.map((cat, idx) => (
-                <button
-                  key={cat.name}
-                  type="button"
-                  onClick={() => setActiveCategory(idx)}
-                  className={`flex-1 py-1.5 px-2 text-center transition-colors cursor-pointer ${
-                    activeCategory === idx
-                      ? 'text-sky-600 font-bold border-b-2 border-sky-600 bg-white'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  {cat.name}
-                </button>
-              ))}
-            </div>
-
-            {/* Emoji Grid */}
-            <div className="p-2.5 grid grid-cols-10 gap-1 overflow-y-auto max-h-36">
-              {EMOJI_CATEGORIES[activeCategory].emojis.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => handleAddEmoji(emoji)}
-                  className="text-lg hover:bg-slate-100 hover:scale-110 rounded p-1 transition-all flex items-center justify-center cursor-pointer"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-2">
+            {EMOJI_PANELS[emojiTab]?.map((emoji) => (
+              <button key={emoji} type="button"
+                onClick={() => setText((prev) => prev + emoji)}
+                className="text-xl hover:scale-125 transition-transform cursor-pointer">{emoji}</button>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Message Input Bar */}
-        <form
-          onSubmit={handleSend}
-          className="bg-white px-3 py-2 border-t border-slate-200 flex items-center space-x-2"
-        >
-          <button
-            type="button"
-            onClick={() => setShowEmojiPicker((prev) => !prev)}
-            className={`p-2 rounded-full transition-colors cursor-pointer ${
-              showEmojiPicker ? 'text-sky-600 bg-sky-50' : 'text-slate-500 hover:text-slate-800'
-            }`}
-            title="Browse all emojis"
-          >
-            <Smile className="w-5 h-5" />
-          </button>
-
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder="Type a message or tap emojis..."
-            className="flex-1 px-4 py-2 bg-slate-100 rounded-full text-xs text-slate-900 outline-none border border-transparent focus:border-sky-500 focus:bg-white transition-all shadow-2xs"
-          />
-
-          <button
-            type="submit"
-            disabled={!inputText.trim()}
-            className={`p-2 rounded-full transition-all cursor-pointer ${
-              inputText.trim()
-                ? 'bg-sky-600 text-white shadow-xs hover:bg-sky-700'
-                : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-            }`}
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </form>
+      {/* Input */}
+      <div className="border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#0D1B2A] px-3 py-2 flex items-center space-x-2 shrink-0">
+        <button type="button" onClick={() => setShowEmojis(!showEmojis)}
+          className="p-2 text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+          <Smile className="w-5 h-5" />
+        </button>
+        <input
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Type a message..."
+          className="flex-1 px-3 py-2 bg-slate-100 dark:bg-[#122337] rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 border border-transparent dark:border-white/10 outline-none focus:bg-white dark:focus:bg-[#122337] focus:ring-1 focus:ring-sky-500 dark:focus:ring-teal-400"
+        />
+        <button type="button" onClick={handleSend} disabled={!text.trim()}
+          className="p-2 bg-sky-600 hover:bg-sky-700 dark:bg-teal-600 dark:hover:bg-teal-500 text-white rounded-xl disabled:bg-slate-300 dark:disabled:bg-slate-700 cursor-pointer transition-colors">
+          <Send className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );

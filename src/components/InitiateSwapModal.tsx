@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
-import { X, ArrowRightLeft, Sparkles, Check } from 'lucide-react';
+import { X, BookOpen, Check } from 'lucide-react';
 
 interface InitiateSwapModalProps {
   peer: UserProfile;
   currentUser: UserProfile;
-  onConfirm: (skillOffered: string, skillWanted: string) => void;
+  onConfirm: (skill: string, skillWanted?: string) => void;
   onClose: () => void;
 }
 
@@ -15,112 +15,75 @@ export const InitiateSwapModal: React.FC<InitiateSwapModalProps> = ({
   onConfirm,
   onClose,
 }) => {
-  const [selectedOffer, setSelectedOffer] = useState(currentUser.skillsOffered[0] || 'Python');
-  const [selectedWant, setSelectedWant] = useState(peer.skillsOffered[0] || 'React');
+  const [selectedSkill, setSelectedSkill] = useState(peer.skillsOffered[0] || '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onConfirm(selectedOffer, selectedWant);
+    if (!selectedSkill) return;
+    onConfirm(selectedSkill);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/75 backdrop-blur-xs">
+      <div className="w-full max-w-md bg-white dark:bg-[#0D1B2A] rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden transition-colors">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-white/10 flex items-center justify-between bg-slate-50/80 dark:bg-[#122337]">
           <div className="flex items-center space-x-2">
-            <ArrowRightLeft className="w-4 h-4 text-sky-600" />
-            <h3 className="text-sm sm:text-base font-bold text-slate-900">
-              Initiate Skill Barter
-            </h3>
+            <BookOpen className="w-4 h-4 text-sky-600 dark:text-teal-400" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Request Learning Session</h3>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-full transition-colors"
-          >
+          <button type="button" onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-full transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div className="flex items-center space-x-3 p-3 rounded-xl bg-sky-50/60 border border-sky-100">
-            <img
-              src={peer.avatar}
-              alt={peer.name}
-              referrerPolicy="no-referrer"
-              className="w-10 h-10 rounded-full object-cover"
-            />
+          {/* Peer Info */}
+          <div className="flex items-center space-x-3 p-3 rounded-xl bg-sky-50/60 dark:bg-sky-950/40 border border-sky-100 dark:border-sky-900/40">
+            <img src={peer.avatar} alt={peer.name} referrerPolicy="no-referrer" className="w-10 h-10 rounded-full object-cover ring-2 ring-sky-500/20" />
             <div>
-              <h4 className="text-xs font-bold text-slate-900">{peer.name}</h4>
-              <p className="text-[11px] text-slate-500">
-                MITS Gwalior • {peer.department}
-              </p>
+              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">{peer.name}</h4>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">{peer.college} • {peer.department}</p>
             </div>
           </div>
 
-          {/* You Will Teach */}
+          {/* Skill Selection */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              1. Which skill will you teach {peer.name}?
-            </label>
-            <div className="grid grid-cols-2 gap-1.5">
-              {currentUser.skillsOffered.map((skill) => (
-                <button
-                  key={skill}
-                  type="button"
-                  onClick={() => setSelectedOffer(skill)}
-                  className={`p-2 rounded-lg text-xs font-semibold text-left border transition-all ${
-                    selectedOffer === skill
-                      ? 'bg-sky-50 border-sky-500 text-sky-900 shadow-2xs'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span>{skill}</span>
-                    {selectedOffer === skill && <Check className="w-3.5 h-3.5 text-sky-600" />}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* You Will Learn */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              2. Which skill do you want to learn from {peer.name}?
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+              What skill do you want to learn from {peer.name.split(' ')[0]}?
             </label>
             <div className="grid grid-cols-2 gap-1.5">
               {peer.skillsOffered.map((skill) => (
                 <button
                   key={skill}
                   type="button"
-                  onClick={() => setSelectedWant(skill)}
-                  className={`p-2 rounded-lg text-xs font-semibold text-left border transition-all ${
-                    selectedWant === skill
-                      ? 'bg-teal-50 border-teal-500 text-teal-900 shadow-2xs'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  onClick={() => setSelectedSkill(skill)}
+                  className={`p-2.5 rounded-lg text-xs font-semibold text-left border transition-all cursor-pointer ${
+                    selectedSkill === skill
+                      ? 'bg-sky-50 dark:bg-teal-950/40 border-sky-500 dark:border-teal-400 text-sky-900 dark:text-teal-200 shadow-xs'
+                      : 'bg-white dark:bg-[#122337] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span>{skill}</span>
-                    {selectedWant === skill && <Check className="w-3.5 h-3.5 text-teal-600" />}
+                    {selectedSkill === skill && <Check className="w-3.5 h-3.5 text-sky-600 dark:text-teal-400" />}
                   </div>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-[11px] text-slate-500">
-            Once sent, the request remains in <strong className="text-slate-700">Pending Confirmation</strong> status until accepted by the peer.
+          <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-[#122337] border border-slate-100 dark:border-white/10 text-[11px] text-slate-500 dark:text-slate-400">
+            <strong className="text-slate-700 dark:text-slate-200">How it works:</strong> Once sent, your request will be pending until {peer.name.split(' ')[0]} accepts. After acceptance, you can start your learning session via chat or video.
           </div>
 
           <button
             type="submit"
-            className="w-full py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all"
+            disabled={!selectedSkill}
+            className="w-full py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-teal-600 dark:hover:bg-teal-500 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
-            Send Skill Swap Request
+            Send Session Request
           </button>
         </form>
       </div>

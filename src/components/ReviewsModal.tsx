@@ -1,245 +1,183 @@
 import React, { useState } from 'react';
-import { UserProfile, PeerReview } from '../types';
-import { X, Star, CheckCircle2, Shield, MessageSquare, Plus, Send } from 'lucide-react';
+import { UserProfile, LearningSession, PeerReview } from '../types';
+import { getBadgeById, BADGE_DEFINITIONS } from '../services/badgeService';
+import { ALL_MITS_BRANCHES } from '../data/mitsBranches';
+import {
+  X, Star, CheckCircle2, BookOpen, Clock, Award,
+  ArrowRightLeft, MessageCircle, Shield
+} from 'lucide-react';
 
-interface ReviewsModalProps {
+interface PeerProfileModalProps {
   peer: UserProfile;
-  currentUser?: UserProfile | null;
-  onClose: () => void;
-  onInitiateSwap: (peer: UserProfile) => void;
+  currentUser?: UserProfile;
+  currentUserId?: string;
+  sessions?: LearningSession[];
   onAddReview?: (peerId: string, review: { rating: number; comment: string; skillLearned: string }) => void;
+  onRequestSession?: () => void;
+  onInitiateSwap?: (peer: UserProfile) => void;
+  onClose: () => void;
 }
 
-export const ReviewsModal: React.FC<ReviewsModalProps> = ({
+export const ReviewsModal: React.FC<PeerProfileModalProps> = ({
   peer,
   currentUser,
-  onClose,
-  onInitiateSwap,
+  currentUserId,
+  sessions = [],
   onAddReview,
+  onRequestSession,
+  onInitiateSwap,
+  onClose,
 }) => {
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [rating, setRating] = useState(5);
-  const [skillLearned, setSkillLearned] = useState(peer.skillsOffered[0] || 'Peer Mentoring');
-  const [comment, setComment] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tab, setTab] = useState<'profile' | 'reviews' | 'badges'>('profile');
+  const branchCode = ALL_MITS_BRANCHES.find((b) => b.value === peer.department)?.code || peer.department;
+  const activeUserId = currentUserId || currentUser?.id || '';
 
-  const handleSubmitReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!comment.trim() || !onAddReview) return;
-    setIsSubmitting(true);
-    onAddReview(peer.id, {
-      rating,
-      comment: comment.trim(),
-      skillLearned,
-    });
-    setIsSubmitting(false);
-    setShowAddForm(false);
-    setComment('');
+  const handleRequest = () => {
+    if (onRequestSession) onRequestSession();
+    else if (onInitiateSwap) onInitiateSwap(peer);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Modal Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-          <div className="flex items-center space-x-3">
-            <div className="relative">
-              <img
-                src={peer.avatar}
-                alt={peer.name}
-                referrerPolicy="no-referrer"
-                className="w-11 h-11 sm:w-12 sm:h-12 rounded-full object-cover ring-2 ring-sky-500/20"
-              />
-              <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-xs">
-                <CheckCircle2 className="w-4 h-4 text-sky-500 fill-sky-500" />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center space-x-1.5">
-                <h3 className="text-sm sm:text-base font-bold text-slate-900">{peer.name}</h3>
-                <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">
-                  MITS Gwalior
-                </span>
-              </div>
-              <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
-                {peer.department} • {peer.year}
-              </p>
-            </div>
-          </div>
+  const peerSessions = (sessions || []).filter(
+    (s) => (s.trainerId === peer.id || s.traineeId === peer.id) && s.status === 'completed'
+  );
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-full transition-colors"
-          >
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 dark:bg-black/75 backdrop-blur-xs">
+      <div className="w-full max-w-lg bg-white dark:bg-[#0D1B2A] rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col max-h-[90vh] transition-colors">
+        {/* Header with profile info */}
+        <div className="p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 dark:from-[#07111F] dark:via-[#0D1B2A] dark:to-[#122337] text-white relative">
+          <button type="button" onClick={onClose} className="absolute top-3 right-3 text-white/60 hover:text-white cursor-pointer">
             <X className="w-5 h-5" />
           </button>
-        </div>
-
-        {/* Teaching Quality & Stats Summary */}
-        <div className="grid grid-cols-3 gap-2 px-4 sm:px-5 py-3 bg-slate-50 border-b border-slate-100 text-center">
-          <div>
-            <div className="flex items-center justify-center space-x-1">
-              <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-              <span className="text-sm sm:text-base font-bold text-slate-900">{peer.averageRating.toFixed(1)}</span>
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <img src={peer.avatar} alt={peer.name} referrerPolicy="no-referrer" className="w-16 h-16 rounded-full object-cover ring-2 ring-white/30" />
+              {peer.verified && (
+                <div className="absolute -bottom-1 -right-1 bg-white dark:bg-[#0D1B2A] rounded-full p-0.5">
+                  <CheckCircle2 className="w-4 h-4 text-sky-500 dark:text-teal-400 fill-sky-500 dark:fill-teal-400" />
+                </div>
+              )}
             </div>
-            <span className="text-[10px] text-slate-500">Average Rating</span>
+            <div>
+              <h2 className="text-lg font-bold font-outfit">{peer.name}</h2>
+              <p className="text-xs text-slate-300">{branchCode} • {peer.year} • {peer.college}</p>
+              <div className="flex items-center space-x-1.5 mt-1">
+                <span className="text-[10px] bg-white/15 px-2 py-0.5 rounded-full font-semibold">{peer.verificationBadge}</span>
+              </div>
+            </div>
           </div>
-
-          <div className="border-x border-slate-200">
-            <span className="text-sm sm:text-base font-bold text-slate-900">{peer.hoursTaught}h</span>
-            <p className="text-[10px] text-slate-500">Hours Taught</p>
-          </div>
-
-          <div>
-            <span className="text-sm sm:text-base font-bold text-slate-900">{peer.reviews.length}</span>
-            <p className="text-[10px] text-slate-500">Peer Reviews</p>
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-2 mt-4">
+            {[
+              { label: 'Sessions', value: peer.completedSessions, icon: BookOpen },
+              { label: 'Teaching', value: `${peer.hoursTaught}h`, icon: Clock },
+              { label: 'Learning', value: `${peer.hoursLearned}h`, icon: BookOpen },
+              { label: 'Rating', value: peer.averageRating.toFixed(1), icon: Star },
+            ].map((s) => (
+              <div key={s.label} className="bg-white/10 rounded-lg p-2 text-center">
+                <span className="text-sm font-bold font-mono">{s.value}</span>
+                <span className="text-[10px] text-slate-300 block">{s.label}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Reviews List & Write Review Button */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
-          <div className="flex items-center justify-between">
-            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center">
-              <MessageSquare className="w-3.5 h-3.5 mr-1.5 text-sky-600" />
-              Student Reviews &amp; Feedback
-            </h4>
-            {currentUser && currentUser.id !== peer.id && onAddReview && (
-              <button
-                type="button"
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="text-xs font-bold text-sky-600 hover:text-sky-700 flex items-center space-x-1 bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-              >
-                <Plus className="w-3 h-3" />
-                <span>{showAddForm ? 'Cancel' : 'Write Review'}</span>
-              </button>
-            )}
-          </div>
+        {/* Tabs */}
+        <div className="flex border-b border-slate-200 dark:border-white/10">
+          {(['profile', 'reviews', 'badges'] as const).map((t) => (
+            <button key={t} type="button" onClick={() => setTab(t)}
+              className={`flex-1 py-2.5 text-xs font-bold capitalize cursor-pointer transition-colors ${tab === t ? 'text-sky-600 dark:text-teal-400 border-b-2 border-sky-600 dark:border-teal-400' : 'text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                }`}>
+              {t} {t === 'reviews' && `(${peer.reviews.length})`} {t === 'badges' && `(${peer.badges.length})`}
+            </button>
+          ))}
+        </div>
 
-          {/* Write Review Form */}
-          {showAddForm && (
-            <form onSubmit={handleSubmitReview} className="p-3.5 rounded-xl border border-sky-200 bg-sky-50/50 space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-800">Your Rating:</label>
-                <div className="flex space-x-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setRating(star)}
-                      className="p-0.5 hover:scale-110 transition-transform cursor-pointer"
-                    >
-                      <Star
-                        className={`w-5 h-5 ${
-                          star <= rating ? 'text-amber-400 fill-amber-400' : 'text-slate-300'
-                        }`}
-                      />
-                    </button>
+        {/* Content */}
+        <div className="p-4 overflow-y-auto flex-1">
+          {tab === 'profile' && (
+            <div className="space-y-4">
+              <p className="text-xs text-slate-700 dark:text-slate-300">{peer.bio}</p>
+              <div>
+                <h4 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Skills Offered</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {peer.skillsOffered.map((s) => (
+                    <span key={s} className="text-[11px] font-semibold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 px-2.5 py-1 rounded-full border border-sky-200 dark:border-sky-800/60">{s}</span>
                   ))}
                 </div>
               </div>
-
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Skill Learned / Subject:
-                </label>
-                <input
-                  type="text"
-                  value={skillLearned}
-                  onChange={(e) => setSkillLearned(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:border-sky-500"
-                  placeholder="e.g. React, Python, UI/UX"
-                  required
-                />
+                <h4 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Wants to Learn</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {peer.skillsWanted.map((s) => (
+                    <span key={s} className="text-[11px] font-semibold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/40 px-2.5 py-1 rounded-full border border-teal-200 dark:border-teal-800/60">{s}</span>
+                  ))}
+                </div>
               </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Your Review / Experience:
-                </label>
-                <textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  rows={2}
-                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:border-sky-500 text-slate-800"
-                  placeholder="Write an authentic review of this peer mentor's session..."
-                  required
-                />
+              {/* Role switching note */}
+              <div className="flex items-center space-x-2 p-3 bg-sky-50 dark:bg-sky-950/40 rounded-xl border border-sky-200/60 dark:border-sky-800/50 text-xs text-sky-800 dark:text-sky-300">
+                <ArrowRightLeft className="w-4 h-4 text-sky-600 dark:text-teal-400 shrink-0" />
+                <p><strong>Learner ↔ Mentor:</strong> Every student can be both a learner and a mentor. Roles are determined by each session.</p>
               </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting || !comment.trim()}
-                className="w-full py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition-all shadow-xs cursor-pointer"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>Publish Peer Review</span>
-              </button>
-            </form>
-          )}
-
-          {peer.reviews.length === 0 ? (
-            <div className="text-center py-8 text-xs text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200 p-6">
-              No reviews recorded yet for {peer.name}. Be the first student to learn from them and leave a review!
             </div>
-          ) : (
-            peer.reviews.map((rev) => (
-              <div
-                key={rev.id}
-                className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-50 transition-colors"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <img
-                      src={rev.reviewerAvatar}
-                      alt={rev.reviewerName}
-                      referrerPolicy="no-referrer"
-                      className="w-7 h-7 rounded-full object-cover"
-                    />
-                    <div>
-                      <h5 className="text-xs font-bold text-slate-800">{rev.reviewerName}</h5>
-                      <span className="text-[10px] text-slate-400 font-medium">Learned: {rev.skillLearned}</span>
+          )}
+
+          {tab === 'reviews' && (
+            <div className="space-y-3">
+              {peer.reviews.length === 0 ? (
+                <p className="text-xs text-slate-400 dark:text-slate-500 text-center py-4">No reviews yet. Reviews can only be submitted after completed sessions.</p>
+              ) : (
+                peer.reviews.map((review) => (
+                  <div key={review.id} className="p-3 rounded-xl border border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-[#122337]/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <img src={review.reviewerAvatar} alt={review.reviewerName} referrerPolicy="no-referrer" className="w-7 h-7 rounded-full object-cover" />
+                        <div>
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{review.reviewerName}</span>
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 block">Learned: {review.skillLearned}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{review.rating.toFixed(1)}</span>
+                      </div>
                     </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-300">"{review.comment}"</p>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block">{review.date}</span>
                   </div>
+                ))
+              )}
+            </div>
+          )}
 
-                  <div className="flex items-center space-x-1 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60">
-                    <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
-                    <span className="text-xs font-bold text-amber-900">{rev.rating}</span>
+          {tab === 'badges' && (
+            <div className="grid grid-cols-2 gap-2">
+              {BADGE_DEFINITIONS.map((badge) => {
+                const earned = (peer.badges || []).find((b) => b.badgeId === badge.id);
+                return (
+                  <div key={badge.id} className={`p-3 rounded-xl text-center transition-all ${earned ? `${badge.bgColor} border ${badge.borderColor}` : 'bg-slate-50 dark:bg-[#122337] border border-slate-200 dark:border-white/10 opacity-40 grayscale'
+                    }`}>
+                    <span className="text-2xl block mb-1">{badge.icon}</span>
+                    <span className={`text-[11px] font-bold block ${earned ? badge.color : 'text-slate-500 dark:text-slate-400'}`}>{badge.name}</span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block">{badge.hindiName}</span>
+                    {earned && <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-1 block">{earned.earnedAt}</span>}
                   </div>
-                </div>
-
-                <p className="text-xs text-slate-600 leading-relaxed italic">
-                  "{rev.comment}"
-                </p>
-
-                <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
-                  <span className="flex items-center">
-                    <Shield className="w-3 h-3 mr-1 text-teal-600" />
-                    Verified MITS Jitsi Session
-                  </span>
-                  <span>{rev.date}</span>
-                </div>
-              </div>
-            ))
+                );
+              })}
+            </div>
           )}
         </div>
 
-        {/* Footer Action */}
-        <div className="p-3 sm:p-4 bg-white border-t border-slate-100 flex items-center justify-between">
-          <div className="text-[11px] sm:text-xs text-slate-500 truncate max-w-[220px]">
-            Wants: <span className="font-semibold text-slate-800">{peer.skillsWanted.join(', ')}</span>
+        {/* CTA */}
+        {peer.id !== activeUserId && (
+          <div className="p-4 border-t border-slate-100 dark:border-white/10">
+            <button type="button" onClick={handleRequest}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-teal-600 dark:hover:bg-teal-500 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center justify-center space-x-1.5 focus:ring-2 focus:ring-teal-400">
+              <BookOpen className="w-4 h-4" />
+              <span>Request Learning Session</span>
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onInitiateSwap(peer);
-            }}
-            className="px-3 sm:px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-bold shadow-sm transition-all whitespace-nowrap cursor-pointer"
-          >
-            Initiate Swap
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

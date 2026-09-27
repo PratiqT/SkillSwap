@@ -74,22 +74,22 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 dark:bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="w-full max-w-lg bg-white dark:bg-[#0D1B2A] rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col max-h-[90vh] transition-colors">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-white/10 flex items-center justify-between bg-slate-50/80 dark:bg-[#122337]">
           <div>
-            <h3 className="text-sm sm:text-base font-bold text-slate-900">
+            <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">
               Edit Skills &amp; Profile (MITS Gwalior)
             </h3>
-            <p className="text-[11px] text-slate-500 font-medium">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
               Configure what skills you can teach and what you want to learn.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-full transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-white/10 rounded-full transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -98,12 +98,12 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         {/* Body */}
         <form onSubmit={handleSave} className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
           {/* Profile Photo Upload */}
-          <div className="flex items-center space-x-4 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+          <div className="flex items-center space-x-4 p-3 bg-slate-50 dark:bg-[#122337] rounded-xl border border-slate-200/80 dark:border-white/10">
             <div className="relative group shrink-0">
               <img
                 src={avatar}
                 alt="Profile Preview"
-                className="w-14 h-14 rounded-full object-cover ring-2 ring-sky-500/30 shadow-xs"
+                className="w-14 h-14 rounded-full object-cover ring-2 ring-sky-500/30 dark:ring-teal-400/40 shadow-xs"
               />
               <label
                 htmlFor="edit-avatar-upload"
@@ -120,13 +120,13 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               />
             </div>
             <div className="flex-1">
-              <span className="block text-xs font-bold text-slate-800">Profile Photo</span>
-              <p className="text-[11px] text-slate-500 mb-1">
+              <span className="block text-xs font-bold text-slate-800 dark:text-slate-200">Profile Photo</span>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-1">
                 Upload your authentic student photo from your phone or device.
               </p>
               <label
                 htmlFor="edit-avatar-upload"
-                className="inline-flex items-center space-x-1 text-xs font-semibold text-sky-600 hover:text-sky-700 cursor-pointer bg-white px-2.5 py-1 rounded-md border border-slate-200 shadow-2xs hover:bg-slate-50"
+                className="inline-flex items-center space-x-1 text-xs font-semibold text-sky-600 dark:text-teal-400 hover:text-sky-700 dark:hover:text-teal-300 cursor-pointer bg-white dark:bg-[#0D1B2A] px-2.5 py-1 rounded-md border border-slate-200 dark:border-white/10 shadow-2xs hover:bg-slate-50 dark:hover:bg-white/5"
               >
                 <Upload className="w-3 h-3" />
                 <span>Choose Image</span>
@@ -137,18 +137,18 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           {/* MITS Branch & Academic Year */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                 MITS Branch / Department
               </label>
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none focus:border-sky-500 text-slate-800 font-medium bg-white cursor-pointer"
+                className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-white/10 rounded-lg outline-none focus:border-sky-500 dark:focus:border-teal-400 text-slate-800 dark:text-slate-100 font-medium bg-white dark:bg-[#122337] cursor-pointer"
               >
                 {MITS_BRANCH_CATEGORIES.map((cat) => (
-                  <optgroup key={cat.category} label={cat.category}>
+                  <optgroup key={cat.category} label={cat.category} className="dark:bg-[#122337] dark:text-slate-200">
                     {cat.branches.map((b) => (
-                      <option key={b.value} value={b.value}>
+                      <option key={b.value} value={b.value} className="dark:bg-[#122337] dark:text-slate-200">
                         {b.label}
                       </option>
                     ))}
@@ -158,33 +158,33 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                 Academic Year
               </label>
               <select
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none focus:border-sky-500 text-slate-800 font-medium bg-white cursor-pointer"
+                className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-white/10 rounded-lg outline-none focus:border-sky-500 dark:focus:border-teal-400 text-slate-800 dark:text-slate-100 font-medium bg-white dark:bg-[#122337] cursor-pointer"
               >
-                <option value="1st Year">1st Year</option>
-                <option value="2nd Year">2nd Year</option>
-                <option value="3rd Year">3rd Year</option>
-                <option value="4th Year">4th Year</option>
-                <option value="5th Year (B.Arch / Architecture)">5th Year (B.Arch / Architecture)</option>
+                <option value="1st Year" className="dark:bg-[#122337] dark:text-slate-200">1st Year</option>
+                <option value="2nd Year" className="dark:bg-[#122337] dark:text-slate-200">2nd Year</option>
+                <option value="3rd Year" className="dark:bg-[#122337] dark:text-slate-200">3rd Year</option>
+                <option value="4th Year" className="dark:bg-[#122337] dark:text-slate-200">4th Year</option>
+                <option value="5th Year (B.Arch / Architecture)" className="dark:bg-[#122337] dark:text-slate-200">5th Year (B.Arch / Architecture)</option>
               </select>
             </div>
           </div>
 
           {/* Bio */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
               About You &amp; Teaching Style
             </label>
             <textarea
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none focus:border-sky-500 text-slate-800"
+              className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-white/10 rounded-lg outline-none focus:border-sky-500 dark:focus:border-teal-400 text-slate-800 dark:text-slate-100 bg-white dark:bg-[#122337]"
               placeholder="e.g. 3rd year CSE student, happy to teach React and learn Guitar!"
             />
           </div>
@@ -192,11 +192,11 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           {/* Skills Offered (Can Teach) */}
           <div className="relative">
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
-                <span className="w-2 h-2 rounded-full bg-sky-500" />
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
+                <span className="w-2 h-2 rounded-full bg-sky-500 dark:bg-teal-400" />
                 <span>Skills Offered (You Can Teach)</span>
               </label>
-              <span className="text-[10px] text-sky-600 font-semibold flex items-center">
+              <span className="text-[10px] text-sky-600 dark:text-teal-400 font-semibold flex items-center">
                 <Sparkles className="w-3 h-3 mr-1" />
                 Suggestions Active
               </span>
@@ -207,13 +207,13 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               {skillsOffered.map((skill) => (
                 <span
                   key={skill}
-                  className="inline-flex items-center text-xs font-semibold text-sky-800 bg-sky-50 px-2.5 py-1 rounded-full border border-sky-200"
+                  className="inline-flex items-center text-xs font-semibold text-sky-800 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 px-2.5 py-1 rounded-full border border-sky-200 dark:border-sky-800/60"
                 >
                   {skill}
                   <button
                     type="button"
                     onClick={() => handleSelectOffered(skill)}
-                    className="ml-1.5 text-sky-500 hover:text-rose-600 cursor-pointer"
+                    className="ml-1.5 text-sky-500 dark:text-sky-400 hover:text-rose-600 cursor-pointer"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -235,7 +235,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   setShowWantedDropdown(false);
                 }}
                 placeholder="Click or type skill (e.g. 'py', 'react', 'guitar')..."
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none focus:border-sky-500 text-slate-800"
+                className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-white/10 rounded-lg outline-none focus:border-sky-500 dark:focus:border-teal-400 text-slate-800 dark:text-slate-100 bg-white dark:bg-[#122337]"
               />
             </div>
 
@@ -257,11 +257,11 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           {/* Skills Wanted (Want to Learn) */}
           <div className="relative">
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
                 <span className="w-2 h-2 rounded-full bg-teal-500" />
                 <span>Skills Wanted (You Want to Learn)</span>
               </label>
-              <span className="text-[10px] text-teal-600 font-semibold flex items-center">
+              <span className="text-[10px] text-teal-600 dark:text-teal-400 font-semibold flex items-center">
                 <Sparkles className="w-3 h-3 mr-1" />
                 Suggestions Active
               </span>
@@ -272,13 +272,13 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               {skillsWanted.map((skill) => (
                 <span
                   key={skill}
-                  className="inline-flex items-center text-xs font-semibold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200"
+                  className="inline-flex items-center text-xs font-semibold text-teal-800 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/40 px-2.5 py-1 rounded-full border border-teal-200 dark:border-teal-800/60"
                 >
                   {skill}
                   <button
                     type="button"
                     onClick={() => handleSelectWanted(skill)}
-                    className="ml-1.5 text-teal-500 hover:text-rose-600 cursor-pointer"
+                    className="ml-1.5 text-teal-500 dark:text-teal-400 hover:text-rose-600 cursor-pointer"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -300,7 +300,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   setShowOfferedDropdown(false);
                 }}
                 placeholder="Click or type skill to search library..."
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-none focus:border-teal-500 text-slate-800"
+                className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-white/10 rounded-lg outline-none focus:border-teal-500 text-slate-800 dark:text-slate-100 bg-white dark:bg-[#122337]"
               />
             </div>
 
@@ -322,7 +322,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 active:scale-[0.99] text-white text-xs font-bold shadow-sm transition-all"
+              className="w-full py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 dark:bg-teal-600 dark:hover:bg-teal-500 active:scale-[0.99] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
             >
               Save Profile Changes
             </button>

@@ -150,8 +150,11 @@ export default function App() {
     setInitiatingPeer(peer);
   };
 
-  const handleConfirmSwap = (skillOffered: string, skillWanted: string) => {
+  const handleConfirmSwap = (skillOrOffered: string, skillWanted?: string) => {
     if (!currentUser || !initiatingPeer) return;
+
+    const actualSkillWanted = skillWanted || skillOrOffered;
+    const actualSkillOffered = skillWanted ? skillOrOffered : (currentUser.skillsOffered[0] || 'General Knowledge');
 
     const newRequest: SwapRequest = {
       id: `req-${Date.now()}`,
@@ -161,8 +164,8 @@ export default function App() {
       toUserId: initiatingPeer.id,
       toUserName: initiatingPeer.name,
       toUserAvatar: initiatingPeer.avatar,
-      skillOffered,
-      skillWanted,
+      skillOffered: actualSkillOffered,
+      skillWanted: actualSkillWanted,
       status: 'pending', // Starts as pending confirmation
       createdAt: 'Just now',
       roomId: `SkillSwap_Room_MITS_${Date.now()}`,
@@ -197,6 +200,7 @@ export default function App() {
 
     const newMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
+      sessionId: reqId,
       requestId: reqId,
       senderId: currentUser.id,
       senderName: currentUser.name,
@@ -214,9 +218,10 @@ export default function App() {
     setTimeout(() => {
       const peerReply: ChatMessage = {
         id: `reply-${Date.now()}`,
+        sessionId: reqId,
         requestId: reqId,
-        senderId: activeChatRequest.toUserId,
-        senderName: activeChatRequest.toUserName,
+        senderId: activeChatRequest.toUserId || activeChatRequest.traineeId || '',
+        senderName: activeChatRequest.toUserName || activeChatRequest.traineeName || 'Peer',
         text: `Got it! Looking forward to our session. Click the video icon above whenever you are ready! 👍`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isMe: false,
@@ -246,7 +251,7 @@ export default function App() {
       if (!prev) return prev;
       return {
         ...prev,
-        credits: prev.credits + 1,
+        credits: (prev.credits ?? 0) + 1,
         hoursLearned: prev.hoursLearned + 1,
       };
     });
@@ -256,10 +261,12 @@ export default function App() {
     const currentBranchCode = ALL_MITS_BRANCHES.find((b) => b.value === currentUser.department)?.code || currentUser.department;
     const newReview = {
       id: `rev-${Date.now()}`,
+      sessionId: feedbackSessionRequest.id,
+      reviewerId: currentUser.id,
       reviewerName: `${currentUser.name} (${currentBranchCode}, ${currentUser.year})`,
       reviewerAvatar: currentUser.avatar,
       rating: rating,
-      skillLearned: feedbackSessionRequest.skillWanted,
+      skillLearned: feedbackSessionRequest.skillWanted || feedbackSessionRequest.skill || 'Session Skill',
       comment,
       date: 'Just now',
     };
@@ -300,6 +307,8 @@ export default function App() {
     const currentBranchCode = ALL_MITS_BRANCHES.find((b) => b.value === currentUser.department)?.code || currentUser.department;
     const newReview = {
       id: `rev-${Date.now()}`,
+      sessionId: `session-direct-${Date.now()}`,
+      reviewerId: currentUser.id,
       reviewerName: `${currentUser.name} (${currentBranchCode}, ${currentUser.year})`,
       reviewerAvatar: currentUser.avatar,
       rating: review.rating,
@@ -393,7 +402,8 @@ export default function App() {
   if (!currentUser || isNewAccountModalOpen) {
     return (
       <AuthModal
-        onSuccess={(user) => {
+        existingUsers={peers}
+        onAuthSuccess={(user) => {
           handleAuthSuccess(user);
         }}
       />
@@ -402,7 +412,7 @@ export default function App() {
 
   // 3. Master Student Dashboard (Dedicated to MITS Gwalior)
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col selection:bg-teal-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#07111F] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-teal-500 selection:text-white transition-colors duration-200">
       {/* Top Header / Profile Stats Bar */}
       <Navbar
         currentUser={currentUser}
@@ -508,11 +518,10 @@ export default function App() {
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`py-1.5 px-3.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  selectedCategory === cat
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                }`}
+                className={`py-1.5 px-3.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${selectedCategory === cat
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
               >
                 {cat}
               </button>
@@ -580,10 +589,10 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto bg-white border-t border-slate-200/90 py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+      <footer className="mt-auto bg-white dark:bg-[#0D1B2A] border-t border-slate-200/90 dark:border-white/10 py-6 transition-colors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
           <div className="flex items-center space-x-2">
-            <span className="font-bold text-slate-800">SkillSwap</span>
+            <span className="font-bold text-slate-800 dark:text-slate-200">SkillSwap</span>
             <span>•</span>
             <span>Madhav Institute of Technology &amp; Science, Gwalior (MITS)</span>
           </div>

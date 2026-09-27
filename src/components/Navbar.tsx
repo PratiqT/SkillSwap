@@ -1,201 +1,153 @@
 import React from 'react';
-import { UserProfile } from '../types';
+import { UserProfile, AppNotification } from '../types';
 import { SkillSwapLogo } from './SkillSwapLogo';
+import { ThemeToggle } from './ThemeToggle';
 import {
-  CheckCircle2,
-  Coins,
-  Clock,
-  BookOpen,
-  Star,
-  Bell,
-  LogOut,
-  Edit3,
-  Users
+  Bell, CheckCircle2, Star, BookOpen,
+  Clock, ArrowRightLeft, Shield, Award
 } from 'lucide-react';
 
 interface NavbarProps {
   currentUser: UserProfile;
-  pendingRequestsCount: number;
-  onOpenRequests: () => void;
-  onOpenEditProfile: () => void;
+  notifications?: AppNotification[];
+  pendingRequestsCount?: number;
+  onOpenRequests?: () => void;
+  onOpenEditProfile?: () => void;
+  onToggleNotifications?: () => void;
+  onEditProfile?: () => void;
   onSwitchPeer: () => void;
-  onLogout: () => void;
+  onCoordinatorView?: () => void;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
-  pendingRequestsCount,
+  notifications = [],
+  pendingRequestsCount = 0,
   onOpenRequests,
   onOpenEditProfile,
+  onToggleNotifications,
+  onEditProfile,
   onSwitchPeer,
-  onLogout,
+  onCoordinatorView,
 }) => {
+  const unreadCount = (notifications ? notifications.filter((n) => !n.read).length : 0) + pendingRequestsCount;
+  const handleEdit = onEditProfile || onOpenEditProfile || (() => {});
+  const handleNotifs = onToggleNotifications || onOpenRequests || (() => {});
+
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-xs">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14 sm:h-20">
-          {/* Left: SkillSwap Brand & Campus Dedication */}
-          <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-            <div className="flex items-center cursor-pointer">
-              <SkillSwapLogo size="sm" showText={true} />
-            </div>
-            <div className="hidden md:block h-7 w-[1px] bg-slate-200" />
-            <div className="hidden md:flex flex-col">
-              <span className="text-[11px] font-bold text-slate-800 tracking-wide">
-                MITS Gwalior
-              </span>
-              <span className="text-[10px] text-slate-400 font-medium">
-                Campus Skill Exchange Network
-              </span>
-            </div>
+    <>
+      {/* Desktop Navbar */}
+      <nav className="w-full bg-white/95 dark:bg-[#0D1B2A]/95 backdrop-blur-md border-b border-slate-200 dark:border-white/10 shadow-xs dark:shadow-black/30 px-4 py-2 flex items-center justify-between sticky top-0 z-30 transition-colors duration-200">
+        <SkillSwapLogo size="sm" />
+
+        <div className="hidden sm:flex items-center space-x-3">
+          {/* Stats Pills */}
+          <div className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-bold">{currentUser.completedSessions} Sessions</span>
           </div>
-
-          {/* Right: User Profile Stats & Action Bar */}
-          <div className="flex items-center space-x-1.5 sm:space-x-4">
-            {/* Wallet Credit Indicator */}
-            <div className="flex items-center space-x-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-amber-50 border border-amber-200/80 text-amber-900 shadow-2xs">
-              <Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500 fill-amber-400 shrink-0" />
-              <div className="flex items-baseline space-x-1">
-                <span className="text-xs sm:text-sm font-extrabold font-mono text-amber-900">
-                  {currentUser.credits}
-                </span>
-                <span className="text-[10px] sm:text-xs font-semibold text-amber-700 hidden sm:inline">
-                  Credits
-                </span>
-              </div>
-            </div>
-
-            {/* Teaching & Learning Counters (Desktop/Tablet) */}
-            <div className="hidden lg:flex items-center space-x-3 px-3 py-1 bg-slate-50 border border-slate-200/80 rounded-xl text-xs">
-              {/* Hours Taught */}
-              <div className="flex items-center space-x-1.5" title="Total hours taught to peers">
-                <Clock className="w-3.5 h-3.5 text-sky-600" />
-                <span className="font-bold text-slate-800">{currentUser.hoursTaught}h</span>
-                <span className="text-[10px] text-slate-400">Taught</span>
-              </div>
-
-              <div className="h-4 w-[1px] bg-slate-200" />
-
-              {/* Hours Learned */}
-              <div className="flex items-center space-x-1.5" title="Total hours learned from peers">
-                <BookOpen className="w-3.5 h-3.5 text-teal-600" />
-                <span className="font-bold text-slate-800">{currentUser.hoursLearned}h</span>
-                <span className="text-[10px] text-slate-400">Learned</span>
-              </div>
-
-              <div className="h-4 w-[1px] bg-slate-200" />
-
-              {/* Total Reviews */}
-              <div className="flex items-center space-x-1" title="Reviews received">
-                <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                <span className="font-bold text-slate-800">{currentUser.totalReviews}</span>
-                <span className="text-[10px] text-slate-400">Reviews</span>
-              </div>
-            </div>
-
-            {/* Swap Request Notifications Bell */}
-            <button
-              type="button"
-              onClick={onOpenRequests}
-              className="relative p-1.5 sm:p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
-              title="Skill Swap Requests"
-            >
-              <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-              {pendingRequestsCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">
-                  {pendingRequestsCount}
-                </span>
-              )}
-            </button>
-
-            {/* User Profile Avatar with Blue Verified Peer Badge */}
-            <div className="flex items-center space-x-1.5 pl-0.5 sm:pl-2">
-              <div
-                onClick={onOpenEditProfile}
-                className="relative cursor-pointer group"
-                title="Click to edit profile photo & skills"
-              >
-                <img
-                  src={currentUser.avatar}
-                  alt={currentUser.name}
-                  referrerPolicy="no-referrer"
-                  className="w-7 h-7 sm:w-9 sm:h-9 rounded-full object-cover ring-2 ring-sky-500/30 group-hover:ring-sky-500 transition-all"
-                />
-                {/* Blue Verified Peer Check Badge */}
-                {currentUser.verified && (
-                  <div
-                    className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-2xs"
-                    title="Verified MITS/Campus Peer"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-sky-500 fill-sky-500" />
-                  </div>
-                )}
-              </div>
-
-              <div className="hidden xl:flex flex-col">
-                <div className="flex items-center space-x-1">
-                  <span className="text-xs font-bold text-slate-900 leading-tight">
-                    {currentUser.name}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <span className="text-[9px] font-semibold text-sky-700 bg-sky-50 px-1.5 py-0.2 rounded-full border border-sky-100">
-                    MITS Student
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons: Edit Profile, Switch Peer, Logout */}
-            <div className="flex items-center space-x-0.5 sm:space-x-1 border-l border-slate-200 pl-1 sm:pl-2">
-              <button
-                type="button"
-                onClick={onOpenEditProfile}
-                className="p-1.5 sm:p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                title="Edit My Profile & Photo"
-              >
-                <Edit3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={onSwitchPeer}
-                className="p-1.5 sm:p-2 text-slate-500 hover:text-sky-700 hover:bg-sky-50 rounded-lg transition-colors cursor-pointer"
-                title="Switch / Add Student Account"
-              >
-                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={onLogout}
-                className="p-1.5 sm:p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                title="Log Out"
-              >
-                <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              </button>
-            </div>
+          <div className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/50">
+            <BookOpen className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-bold">{currentUser.hoursLearned}h Learned</span>
+          </div>
+          <div className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800/50">
+            <Clock className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-bold">{currentUser.hoursTaught}h Taught</span>
+          </div>
+          <div className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50">
+            <Star className="w-3.5 h-3.5 fill-amber-400" />
+            <span className="text-[10px] font-bold">{currentUser.averageRating.toFixed(1)}</span>
           </div>
         </div>
 
-        {/* Mobile Stats Ribbon (Under header on mobile screens) */}
-        <div className="lg:hidden flex items-center justify-around py-1.5 border-t border-slate-100 text-[10px] sm:text-[11px] font-medium text-slate-600">
-          <div className="flex items-center space-x-1">
-            <Clock className="w-3 h-3 text-sky-600" />
-            <span>{currentUser.hoursTaught}h Taught</span>
+        <div className="flex items-center space-x-2">
+          {/* Theme Toggle */}
+          <ThemeToggle />
+
+          {/* Coordinator Demo Access */}
+          <button
+            type="button"
+            onClick={onCoordinatorView}
+            className="p-1.5 text-slate-400 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer"
+            title="Coordinator Demo"
+            aria-label="Coordinator Demo"
+          >
+            <Shield className="w-4.5 h-4.5" />
+          </button>
+
+          {/* Notifications / Requests */}
+          <button
+            type="button"
+            onClick={handleNotifs}
+            className="relative p-1.5 text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer"
+            title="Notifications & Requests"
+            aria-label="Notifications & Requests"
+          >
+            <Bell className="w-4.5 h-4.5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse-ring">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Profile */}
+          <div 
+            className="flex items-center space-x-1.5 px-2 py-1 rounded-full hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer" 
+            onClick={handleEdit}
+            role="button"
+            tabIndex={0}
+            aria-label="Edit Profile"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleEdit(); }}
+          >
+            <div className="relative">
+              <img
+                src={currentUser.avatar}
+                alt={currentUser.name}
+                referrerPolicy="no-referrer"
+                className="w-7 h-7 rounded-full object-cover ring-2 ring-sky-500/30 dark:ring-sky-400/50"
+              />
+              {currentUser.verified && (
+                <div className="absolute -bottom-0.5 -right-0.5 bg-white dark:bg-[#0D1B2A] rounded-full p-0.5">
+                  <CheckCircle2 className="w-3 h-3 text-sky-500 fill-sky-500" />
+                </div>
+              )}
+            </div>
+            <span className="text-xs font-bold text-slate-800 dark:text-slate-100 hidden sm:inline">{currentUser.name.split(' ')[0]}</span>
           </div>
-          <div className="h-3 w-[1px] bg-slate-200" />
-          <div className="flex items-center space-x-1">
-            <BookOpen className="w-3 h-3 text-teal-600" />
-            <span>{currentUser.hoursLearned}h Learned</span>
-          </div>
-          <div className="h-3 w-[1px] bg-slate-200" />
-          <div className="flex items-center space-x-1">
-            <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
-            <span>{currentUser.totalReviews} Reviews</span>
-          </div>
+
+          {/* Switch / Menu */}
+          <button
+            type="button"
+            onClick={onSwitchPeer}
+            className="p-1.5 text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 rounded-full transition-colors cursor-pointer"
+            title="Switch Account"
+            aria-label="Switch Account"
+          >
+            <ArrowRightLeft className="w-4 h-4" />
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile Stats Ribbon */}
+      <div className="sm:hidden w-full bg-white dark:bg-[#0D1B2A] border-b border-slate-100 dark:border-white/10 px-3 py-1.5 flex items-center justify-between overflow-x-auto scrollbar-none transition-colors duration-200">
+        <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold whitespace-nowrap">
+          <CheckCircle2 className="w-3 h-3" /><span>{currentUser.completedSessions} Sessions</span>
+        </div>
+        <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 text-[10px] font-bold whitespace-nowrap">
+          <BookOpen className="w-3 h-3" /><span>{currentUser.hoursLearned}h</span>
+        </div>
+        <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 text-[10px] font-bold whitespace-nowrap">
+          <Clock className="w-3 h-3" /><span>{currentUser.hoursTaught}h</span>
+        </div>
+        <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-[10px] font-bold whitespace-nowrap">
+          <Star className="w-3 h-3 fill-amber-400" /><span>{currentUser.averageRating.toFixed(1)}</span>
+        </div>
+        <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 text-[10px] font-bold whitespace-nowrap">
+          <Award className="w-3 h-3" /><span>{currentUser.badges.length}</span>
         </div>
       </div>
-    </header>
+    </>
   );
 };

@@ -1,18 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { UserProfile, SwapRequest } from '../types';
+import { UserProfile, LearningSession } from '../types';
 import { PhoneOff, Clock, Video, ShieldCheck, Copy, Check, ExternalLink } from 'lucide-react';
 
 interface VideoCallModalProps {
-  request: SwapRequest;
+  session?: LearningSession;
+  request?: LearningSession;
   currentUser: UserProfile;
   onCallEnd: () => void;
 }
 
 export const VideoCallModal: React.FC<VideoCallModalProps> = ({
+  session,
   request,
   currentUser,
   onCallEnd,
 }) => {
+  const activeSession = session || request;
   const containerRef = useRef<HTMLDivElement>(null);
   const jitsiApiRef = useRef<any>(null);
 
@@ -23,7 +26,7 @@ export const VideoCallModal: React.FC<VideoCallModalProps> = ({
 
   // Generate distinct room ID
   const roomId = useRef(
-    request.roomId ||
+    activeSession?.roomId ||
       `SkillSwap_Room_MITS_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
   ).current;
 
@@ -173,7 +176,7 @@ export const VideoCallModal: React.FC<VideoCallModalProps> = ({
               </span>
             </div>
             <p className="text-[10px] sm:text-[11px] text-slate-400 truncate max-w-[200px] sm:max-w-none">
-              With {request.toUserName} • {request.skillOffered} ⇄ {request.skillWanted}
+              With {activeSession ? (activeSession.trainerId === currentUser.id ? activeSession.traineeName : activeSession.trainerName) || activeSession.toUserName || 'Peer' : 'Peer'} • {activeSession?.skill ? `Session #${activeSession.sessionNumber}: ${activeSession.skill}` : (activeSession?.skillOffered && activeSession?.skillWanted ? `${activeSession.skillOffered} ⇄ ${activeSession.skillWanted}` : 'Learning Session')}
             </p>
           </div>
         </div>
