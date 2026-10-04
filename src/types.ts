@@ -16,12 +16,66 @@ export interface Institution {
   studentCount?: string;
 }
 
-// --- User Profile (credits removed, badges/strikes added) ---
+// --- Credential Categories & Item ---
+export type CredentialCategory = 'certification' | 'course' | 'hackathon' | 'competition' | 'achievement';
+
+export interface Credential {
+  id: string;
+  title: string;
+  issuer: string;
+  issueDate: string;
+  category: CredentialCategory;
+  verified: boolean;
+  verificationUrl?: string;
+  credentialId?: string;
+  description?: string;
+}
+
+// --- Project Showcase ---
+export interface Project {
+  id: string;
+  title: string;
+  tagline: string;
+  description: string;
+  role: string;
+  technologies: string[];
+  githubUrl?: string;
+  liveUrl?: string;
+  featured?: boolean;
+  date?: string;
+}
+
+// --- Achievement Milestone ---
+export interface Achievement {
+  id: string;
+  title: string;
+  organization: string;
+  year: string;
+  category?: 'hackathon' | 'academic' | 'competition' | 'leadership';
+  badgeIcon?: string;
+  description?: string;
+}
+
+// --- Activity Event ---
+export interface ActivityEvent {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  type: 'session_completed' | 'credential_added' | 'badge_earned' | 'peer_helped' | 'project_added';
+  title: string;
+  detail: string;
+  timestamp: string;
+}
+
+// --- User Profile (professional student identity model) ---
 export interface UserProfile {
   id: string;
   name: string;
   username: string;
   avatar: string;
+  headline?: string;
+  coverImage?: string;
   email?: string;
   phone?: string;
   institutionId: string;
@@ -38,6 +92,12 @@ export interface UserProfile {
   averageRating: number;
   skillsOffered: string[];
   skillsWanted: string[];
+  skillProficiencies?: Record<string, 'Beginner' | 'Intermediate' | 'Advanced'>;
+  endorsements?: Record<string, string[]>; // skillName -> array of studentIds
+  credentials?: Credential[];
+  projects?: Project[];
+  achievements?: Achievement[];
+  activityEvents?: ActivityEvent[];
   reviews: PeerReview[];
   badges: UserBadge[];
   strikes: number;

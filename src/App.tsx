@@ -3,15 +3,23 @@ import {
   UserProfile,
   SwapRequest,
   ChatMessage,
-  NanoSkill
+  ModerationFlag,
+  Appeal,
+  Credential,
+  Project,
+  Achievement
 } from './types';
 import { INITIAL_MITS_PEERS } from './data/initialPeers';
-import { NANO_SKILLS_LIBRARY } from './data/skillsLibrary';
+import { DEMO_FLAGS, DEMO_SESSIONS } from './data/demoData';
 import { ALL_MITS_BRANCHES } from './data/mitsBranches';
 import { SplashScreen } from './components/SplashScreen';
 import { AuthModal } from './components/AuthModal';
-import { Navbar } from './components/Navbar';
-import { PeerCard } from './components/PeerCard';
+import { Navbar, NavigationTab } from './components/Navbar';
+import { FeedView } from './components/FeedView';
+import { DiscoverStudentsView } from './components/DiscoverStudentsView';
+import { ProfileView } from './components/profile/ProfileView';
+import { CoordinatorDashboard } from './components/CoordinatorDashboard';
+import { AIAssistantWidget } from './components/AIAssistantWidget';
 import { ReviewsModal } from './components/ReviewsModal';
 import { InitiateSwapModal } from './components/InitiateSwapModal';
 import { SwapRequestsDrawer } from './components/SwapRequestsDrawer';
@@ -20,20 +28,6 @@ import { VideoCallModal } from './components/VideoCallModal';
 import { PostSessionFeedbackModal } from './components/PostSessionFeedbackModal';
 import { EditProfileModal } from './components/EditProfileModal';
 import { SwitchPeerModal } from './components/SwitchPeerModal';
-import {
-  Search,
-  Filter,
-  Sparkles,
-  ArrowRightLeft,
-  GraduationCap,
-  ShieldCheck,
-  CheckCircle2,
-  TrendingUp,
-  Plus,
-  Flame,
-  Award,
-  Video
-} from 'lucide-react';
 
 const STORAGE_KEY_USER = 'skillswap_current_user';
 const STORAGE_KEY_PEERS = 'skillswap_peers';
@@ -45,7 +39,15 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
 
   // Authenticated User State (Starts as null so Splash -> Sign Up / Log In appears on app open)
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_USER);
+      if (saved) return JSON.parse(saved);
+      return null;
+    } catch {
+      return null;
+    }
+  });
 
   // All Peers in Feed (MITS Gwalior only)
   const [peers, setPeers] = useState<UserProfile[]>(() => {
@@ -61,6 +63,12 @@ export default function App() {
       return INITIAL_MITS_PEERS;
     }
   });
+
+  // Active Navigation Tab
+  const [activeTab, setActiveTab] = useState<NavigationTab>('feed');
+
+  // Peer profile being viewed (null when viewing own profile or on feed)
+  const [viewingProfilePeer, setViewingProfilePeer] = useState<UserProfile | null>(null);
 
   // Swap Requests
   const [swapRequests, setSwapRequests] = useState<SwapRequest[]>(() => {
@@ -91,10 +99,12 @@ export default function App() {
     }
   });
 
-  // Search & Filter State
+  // Moderation & Appeals state for Coordinator console
+  const [moderationFlags, setModerationFlags] = useState<ModerationFlag[]>(DEMO_FLAGS);
+  const [appeals, setAppeals] = useState<Appeal[]>([]);
+
+  // Search State
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [filterSkillWanted, setFilterSkillWanted] = useState('');
 
   // Modals & Drawers
   const [inspectingPeer, setInspectingPeer] = useState<UserProfile | null>(null);
@@ -135,13 +145,13 @@ export default function App() {
     setCurrentUser(user);
     setIsNewAccountModalOpen(false);
 
-    // If new user, also insert into peers list so they appear in MITS directory
+    // If new user, insert into peers list so they appear in MITS directory
     setPeers((prev) => {
       const exists = prev.some((p) => p.id === user.id);
       if (!exists) {
         return [user, ...prev];
       }
-      return prev;
+      return prev.map((p) => (p.id === user.id ? user : p));
     });
   };
 
@@ -154,7 +164,9 @@ export default function App() {
     if (!currentUser || !initiatingPeer) return;
 
     const actualSkillWanted = skillWanted || skillOrOffered;
-    const actualSkillOffered = skillWanted ? skillOrOffered : (currentUser.skillsOffered[0] || 'General Knowledge');
+    const actualSkillOffered = skillWanted
+      ? skillOrOffered
+      : currentUser.skillsOffered[0] || 'General Knowledge';
 
     const newRequest: SwapRequest = {
       id: `req-${Date.now()}`,
@@ -166,7 +178,7 @@ export default function App() {
       toUserAvatar: initiatingPeer.avatar,
       skillOffered: actualSkillOffered,
       skillWanted: actualSkillWanted,
-      status: 'pending', // Starts as pending confirmation
+      status: 'pending',
       createdAt: 'Just now',
       roomId: `SkillSwap_Room_MITS_${Date.now()}`,
     };
@@ -175,7 +187,7 @@ export default function App() {
     setIsRequestsDrawerOpen(true);
   };
 
-  // Accept Swap Request (Simulated or Real)
+  // Accept Swap Request
   const handleAcceptRequest = (requestId: string) => {
     setSwapRequests((prev) =>
       prev.map((req) =>
@@ -258,7 +270,9 @@ export default function App() {
 
     // 2. Insert review directly into peer's permanent record
     const targetPeerId = feedbackSessionRequest.toUserId;
-    const currentBranchCode = ALL_MITS_BRANCHES.find((b) => b.value === currentUser.department)?.code || currentUser.department;
+    const currentBranchCode =
+      ALL_MITS_BRANCHES.find((b) => b.value === currentUser.department)?.code ||
+      currentUser.department;
     const newReview = {
       id: `rev-${Date.now()}`,
       sessionId: feedbackSessionRequest.id,
@@ -266,7 +280,10 @@ export default function App() {
       reviewerName: `${currentUser.name} (${currentBranchCode}, ${currentUser.year})`,
       reviewerAvatar: currentUser.avatar,
       rating: rating,
-      skillLearned: feedbackSessionRequest.skillWanted || feedbackSessionRequest.skill || 'Session Skill',
+      skillLearned:
+        feedbackSessionRequest.skillWanted ||
+        feedbackSessionRequest.skill ||
+        'Session Skill',
       comment,
       date: 'Just now',
     };
@@ -302,9 +319,14 @@ export default function App() {
   };
 
   // Direct Review addition
-  const handleAddReview = (peerId: string, review: { rating: number; comment: string; skillLearned: string }) => {
+  const handleAddReview = (
+    peerId: string,
+    review: { rating: number; comment: string; skillLearned: string }
+  ) => {
     if (!currentUser) return;
-    const currentBranchCode = ALL_MITS_BRANCHES.find((b) => b.value === currentUser.department)?.code || currentUser.department;
+    const currentBranchCode =
+      ALL_MITS_BRANCHES.find((b) => b.value === currentUser.department)?.code ||
+      currentUser.department;
     const newReview = {
       id: `rev-${Date.now()}`,
       sessionId: `session-direct-${Date.now()}`,
@@ -360,37 +382,29 @@ export default function App() {
     );
   };
 
-  // Filter peers
-  const filteredPeers = peers.filter((p) => {
-    // Hide current user from their own feed
-    if (currentUser && p.id === currentUser.id) return false;
-
-    // Search query matching name, skills offered, skills wanted
-    const matchesSearch =
-      !searchQuery ||
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.skillsOffered.some((s) => s.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      p.skillsWanted.some((s) => s.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      p.department.toLowerCase().includes(searchQuery.toLowerCase());
-
-    // Category filter
-    let matchesCategory = true;
-    if (selectedCategory !== 'All') {
-      const categorySkills = NANO_SKILLS_LIBRARY.filter(
-        (s) => s.category.toLowerCase() === selectedCategory.toLowerCase()
-      ).map((s) => s.name.toLowerCase());
-
-      matchesCategory = p.skillsOffered.some((skill) =>
-        categorySkills.includes(skill.toLowerCase())
+  // Update user from ProfileView (credentials, projects, achievements, endorsements)
+  const handleUpdateProfileUser = (updated: Partial<UserProfile>) => {
+    if (viewingProfilePeer) {
+      const updatedPeer = { ...viewingProfilePeer, ...updated };
+      setViewingProfilePeer(updatedPeer);
+      setPeers((prev) =>
+        prev.map((p) => (p.id === updatedPeer.id ? updatedPeer : p))
       );
+      return;
     }
+    if (!currentUser) return;
+    const updatedUser = { ...currentUser, ...updated };
+    setCurrentUser(updatedUser);
+    setPeers((prev) =>
+      prev.map((p) => (p.id === updatedUser.id ? updatedUser : p))
+    );
+  };
 
-    return matchesSearch && matchesCategory;
-  });
-
-  // Calculate incoming pending requests count for current user (Instagram follow request style)
+  // Calculate incoming pending requests count for current user
   const incomingPendingCount = currentUser
-    ? swapRequests.filter((r) => r.toUserId === currentUser.id && r.status === 'pending').length
+    ? swapRequests.filter(
+        (r) => r.toUserId === currentUser.id && r.status === 'pending'
+      ).length
     : 0;
 
   // 1. Initial Splash Screen
@@ -410,12 +424,22 @@ export default function App() {
     );
   }
 
-  // 3. Master Student Dashboard (Dedicated to MITS Gwalior)
+  // Determine active profile to display when in Profile view
+  const activeProfileUser = viewingProfilePeer || currentUser;
+  const isViewingSelf = !viewingProfilePeer || viewingProfilePeer.id === currentUser.id;
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#07111F] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-teal-500 selection:text-white transition-colors duration-200">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#060b13] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-teal-500 selection:text-white transition-colors duration-200">
       {/* Top Header / Profile Stats Bar */}
       <Navbar
         currentUser={currentUser}
+        activeTab={viewingProfilePeer ? 'discover' : activeTab}
+        onChangeTab={(tab) => {
+          setViewingProfilePeer(null);
+          setActiveTab(tab);
+        }}
+        searchQuery={searchQuery}
+        onSearchChange={(q) => setSearchQuery(q)}
         pendingRequestsCount={incomingPendingCount}
         onOpenRequests={() => setIsRequestsDrawerOpen(true)}
         onOpenEditProfile={() => setIsEditProfileOpen(true)}
@@ -426,170 +450,108 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-        {/* MITS Institutional Banner Card */}
-        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 text-white rounded-2xl p-6 sm:p-8 shadow-sm relative overflow-hidden">
-          <div className="relative z-10 max-w-2xl">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-300 text-xs font-bold mb-3">
-              <ShieldCheck className="w-4 h-4 text-sky-400" />
-              <span>Dedicated Campus Domain • MITS Gwalior</span>
-            </div>
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 sm:pb-12 space-y-6">
+        {/* VIEW 1: Profile View (If viewing a peer OR activeTab is 'profile') */}
+        {(viewingProfilePeer || activeTab === 'profile') && (
+          <ProfileView
+            user={activeProfileUser}
+            currentUser={currentUser}
+            isCurrentUser={isViewingSelf}
+            onBack={() => setViewingProfilePeer(null)}
+            onEditProfile={() => setIsEditProfileOpen(true)}
+            onRequestSession={(peer) => handleInitiateSwap(peer)}
+            onOpenChat={(peer) => {
+              const req = swapRequests.find(
+                (r) =>
+                  (r.fromUserId === currentUser.id && r.toUserId === peer.id) ||
+                  (r.toUserId === currentUser.id && r.fromUserId === peer.id)
+              );
+              if (req) {
+                setActiveChatRequest(req);
+              } else {
+                handleInitiateSwap(peer);
+              }
+            }}
+            onUpdateUser={handleUpdateProfileUser}
+          />
+        )}
 
-            <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight font-outfit">
-              Trade Skills 1-on-1 with Verified Campus Peers
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
-              No cash required. Teach what you know (Coding, Design, Music, Fitness) and learn what you need from fellow students at <strong className="text-white">Madhav Institute of Technology &amp; Science</strong>.
-            </p>
+        {/* VIEW 2: Feed View */}
+        {!viewingProfilePeer && activeTab === 'feed' && (
+          <FeedView
+            currentUser={currentUser}
+            peers={peers}
+            swapRequests={swapRequests}
+            onNavigateTab={(tab) => {
+              setViewingProfilePeer(null);
+              setActiveTab(tab);
+            }}
+            onViewPeerProfile={(peer) => setViewingProfilePeer(peer)}
+            onRequestSession={(peer) => handleInitiateSwap(peer)}
+            onOpenRequestsDrawer={() => setIsRequestsDrawerOpen(true)}
+            onOpenEditProfile={() => setIsEditProfileOpen(true)}
+          />
+        )}
 
-            {/* Quick Stats Pills */}
-            <div className="flex flex-wrap gap-2 mt-5">
-              <div className="flex items-center space-x-1.5 bg-white/10 backdrop-blur-xs px-3 py-1.5 rounded-lg text-xs font-semibold">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{peers.length} Verified Students</span>
-              </div>
-              <div className="flex items-center space-x-1.5 bg-white/10 backdrop-blur-xs px-3 py-1.5 rounded-lg text-xs font-semibold">
-                <Flame className="w-3.5 h-3.5 text-amber-400" />
-                <span>15+ Popular Skills</span>
-              </div>
-              <div className="flex items-center space-x-1.5 bg-white/10 backdrop-blur-xs px-3 py-1.5 rounded-lg text-xs font-semibold">
-                <Video className="w-3.5 h-3.5 text-teal-400" />
-                <span>HD Jitsi 1-on-1 Video Classrooms</span>
-              </div>
-            </div>
-          </div>
+        {/* VIEW 3: Discover Students View */}
+        {!viewingProfilePeer && activeTab === 'discover' && (
+          <DiscoverStudentsView
+            currentUser={currentUser}
+            peers={peers}
+            searchQuery={searchQuery}
+            onSearchChange={(q) => setSearchQuery(q)}
+            onViewProfile={(peer) => setViewingProfilePeer(peer)}
+            onRequestSession={(peer) => handleInitiateSwap(peer)}
+            activeRequests={swapRequests}
+          />
+        )}
 
-          {/* Subtle decorative campus badge background */}
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-10 opacity-10 pointer-events-none hidden md:block">
-            <GraduationCap className="w-80 h-80 text-white" />
-          </div>
-        </div>
-
-        {/* Search, Filter & Skill Categories Bar */}
-        <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            {/* Search Input */}
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search peers by name, skill offered (e.g. 'React', 'Python', 'Guitar')..."
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 outline-none focus:border-sky-500 shadow-2xs"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-
-            {/* Quick Actions */}
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={() => setIsEditProfileOpen(true)}
-                className="py-2.5 px-3.5 rounded-xl bg-white border border-slate-200 hover:border-sky-400 text-slate-700 text-xs font-bold flex items-center space-x-1.5 shadow-2xs transition-colors cursor-pointer"
-              >
-                <Plus className="w-4 h-4 text-sky-600" />
-                <span>Offer a Skill</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsRequestsDrawerOpen(true)}
-                className="py-2.5 px-3.5 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-bold flex items-center space-x-1.5 shadow-2xs transition-all cursor-pointer"
-              >
-                <ArrowRightLeft className="w-4 h-4" />
-                <span>My Swaps ({swapRequests.length})</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Category Filter Pills */}
-          <div className="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none">
-            {['All', 'Tech', 'Creative Arts', 'Music', 'Fitness', 'Media'].map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={`py-1.5 px-3.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${selectedCategory === cat
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                  }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Peer Feed Grid */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 font-outfit">
-                MITS Gwalior Peer Feed
-              </h2>
-              <span className="text-xs font-semibold text-slate-400">
-                ({filteredPeers.length} student peers available)
-              </span>
-            </div>
-
-            <div className="text-xs text-slate-500 font-medium hidden sm:block">
-              Institutional verified peers only
-            </div>
-          </div>
-
-          {filteredPeers.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-8 sm:p-12 text-center flex flex-col items-center justify-center shadow-xs">
-              <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
-                <GraduationCap className="w-7 h-7" />
-              </div>
-              <h3 className="text-base sm:text-lg font-bold text-slate-700">
-                No user till now
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-sm">
-                No student peers registered yet on campus.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredPeers.map((peer) => {
-                // Find active swap request for this peer if any
-                const peerReq = swapRequests.find(
-                  (r) =>
-                    (r.fromUserId === currentUser.id && r.toUserId === peer.id) ||
-                    (r.toUserId === currentUser.id && r.fromUserId === peer.id)
-                );
-
-                return (
-                  <PeerCard
-                    key={peer.id}
-                    peer={peer}
-                    currentUserId={currentUser.id}
-                    activeRequest={peerReq}
-                    onViewReviews={(p) => setInspectingPeer(p)}
-                    onInitiateSwap={(p) => handleInitiateSwap(p)}
-                    onOpenChat={(req) => setActiveChatRequest(req)}
-                    onStartVideo={(req) => setActiveVideoRequest(req)}
-                    onAcceptRequest={handleAcceptRequest}
-                    onDeclineRequest={handleDeclineRequest}
-                  />
-                );
-              })}
-            </div>
-          )}
-        </section>
+        {/* VIEW 4: Campus Coordinator Console */}
+        {!viewingProfilePeer && activeTab === 'coordinator' && (
+          <CoordinatorDashboard
+            allStudents={peers}
+            allSessions={swapRequests}
+            moderationFlags={moderationFlags}
+            appeals={appeals}
+            onDismissFlag={(flagId) => {
+              setModerationFlags((prev) =>
+                prev.map((f) => (f.id === flagId ? { ...f, status: 'dismissed' } : f))
+              );
+            }}
+            onActionFlag={(flagId) => {
+              setModerationFlags((prev) =>
+                prev.map((f) => (f.id === flagId ? { ...f, status: 'actioned' } : f))
+              );
+            }}
+            onAcceptAppeal={(appealId) => {
+              setAppeals((prev) =>
+                prev.map((a) => (a.id === appealId ? { ...a, status: 'accepted' } : a))
+              );
+            }}
+            onRejectAppeal={(appealId) => {
+              setAppeals((prev) =>
+                prev.map((a) => (a.id === appealId ? { ...a, status: 'rejected' } : a))
+              );
+            }}
+            onIssueCertificate={(userId) => {
+              // Certificate issued
+            }}
+            onBack={() => setActiveTab('feed')}
+          />
+        )}
       </main>
 
+      {/* Subtle Floating AI Assistant */}
+      <AIAssistantWidget
+        currentUser={currentUser}
+        peers={peers}
+        onViewPeerProfile={(peer) => setViewingProfilePeer(peer)}
+        onRequestSession={(peer) => handleInitiateSwap(peer)}
+        onOpenEditProfile={() => setIsEditProfileOpen(true)}
+      />
+
       {/* Footer */}
-      <footer className="mt-auto bg-white dark:bg-[#0D1B2A] border-t border-slate-200/90 dark:border-white/10 py-6 transition-colors">
+      <footer className="mt-auto bg-white dark:bg-[#0c1524] border-t border-slate-200/80 dark:border-white/10 py-6 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
           <div className="flex items-center space-x-2">
             <span className="font-bold text-slate-800 dark:text-slate-200">SkillSwap</span>
@@ -597,11 +559,11 @@ export default function App() {
             <span>Madhav Institute of Technology &amp; Science, Gwalior (MITS)</span>
           </div>
           <div className="flex items-center space-x-4 text-[11px]">
-            <span>Twilio Real SMS Verification</span>
+            <span>Verified Student Network</span>
             <span>•</span>
             <span>Jitsi WebRTC Video</span>
             <span>•</span>
-            <span>Skill Match Engine</span>
+            <span>Peer Learning Credentials</span>
           </div>
         </div>
       </footer>
@@ -652,12 +614,15 @@ export default function App() {
         />
       )}
 
-      {/* MODAL 4: Switch Peer Account (Strict Test Requirement) */}
+      {/* MODAL 4: Switch Peer Account */}
       {isSwitchPeerOpen && (
         <SwitchPeerModal
           currentUserId={currentUser.id}
           allPeers={peers}
-          onSelectUser={(selected) => setCurrentUser(selected)}
+          onSelectUser={(selected) => {
+            setCurrentUser(selected);
+            setViewingProfilePeer(null);
+          }}
           onAddNewAccount={() => {
             setIsSwitchPeerOpen(false);
             setIsNewAccountModalOpen(true);

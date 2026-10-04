@@ -16,6 +16,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   onClose,
 }) => {
   const [avatar, setAvatar] = useState(currentUser.avatar);
+  const [headline, setHeadline] = useState(currentUser.headline || '');
   const [bio, setBio] = useState(currentUser.bio);
   const [department, setDepartment] = useState(currentUser.department || 'Computer Science & Engineering');
   const [year, setYear] = useState(currentUser.year || '3rd Year');
@@ -64,6 +65,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     e.preventDefault();
     onSave({
       avatar,
+      headline: headline.trim(),
       bio,
       department,
       year,
@@ -173,6 +175,20 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 <option value="5th Year (B.Arch / Architecture)" className="dark:bg-[#122337] dark:text-slate-200">5th Year (B.Arch / Architecture)</option>
               </select>
             </div>
+          </div>
+
+          {/* Professional Headline */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+              Professional Headline
+            </label>
+            <input
+              type="text"
+              value={headline}
+              onChange={(e) => setHeadline(e.target.value)}
+              placeholder="e.g. Full-Stack Developer • React, Node.js & System Architecture"
+              className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-white/10 rounded-lg outline-none focus:border-sky-500 dark:focus:border-teal-400 text-slate-800 dark:text-slate-100 bg-white dark:bg-[#122337]"
+            />
           </div>
 
           {/* Bio */}
