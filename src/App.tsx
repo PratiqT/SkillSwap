@@ -536,6 +536,27 @@ export default function App() {
             onIssueCertificate={(userId) => {
               // Certificate issued
             }}
+            onSuspendUser={(userId) => {
+              setPeers((prev) =>
+                prev.map((p) => p.id === userId ? { ...p, suspended: true, strikes: Math.max(p.strikes, 3) } : p)
+              );
+              if (currentUser?.id === userId) {
+                setCurrentUser((prev) => prev ? { ...prev, suspended: true } : prev);
+              }
+            }}
+            onRestoreUser={(userId) => {
+              setPeers((prev) =>
+                prev.map((p) => p.id === userId ? { ...p, suspended: false, appealPending: false } : p)
+              );
+              if (currentUser?.id === userId) {
+                setCurrentUser((prev) => prev ? { ...prev, suspended: false, appealPending: false } : prev);
+              }
+            }}
+            onWarnUser={(userId) => {
+              setPeers((prev) =>
+                prev.map((p) => p.id === userId ? { ...p, strikes: Math.min((p.strikes || 0) + 1, 3) } : p)
+              );
+            }}
             onBack={() => setActiveTab('feed')}
           />
         )}
@@ -636,8 +657,43 @@ export default function App() {
         <ChatModule
           request={activeChatRequest}
           messages={chatMessages[activeChatRequest.id] || []}
+          currentUser={currentUser}
           currentUserId={currentUser.id}
           onSendMessage={handleSendMessage}
+          onFlagMessage={(category, severity, messageContent) => {
+            const flag = {
+              id: `flag-${Date.now()}`,
+              userId: currentUser.id,
+              userName: currentUser.name,
+              userAvatar: currentUser.avatar,
+              sessionId: activeChatRequest.id,
+              messageContent,
+              contentType: 'chat' as const,
+              category,
+              severity: severity as any,
+              status: 'pending' as const,
+              strikeIssued: severity === 'critical' || severity === 'high',
+              createdAt: new Date().toISOString(),
+            };
+            setModerationFlags((prev) => [flag, ...prev]);
+            if (severity === 'critical' || severity === 'high') {
+              // Issue a strike on the user; suspend if strikes reach 3
+              setCurrentUser((prev) => {
+                if (!prev) return prev;
+                const newStrikes = Math.min((prev.strikes || 0) + 1, 3);
+                return { ...prev, strikes: newStrikes, suspended: prev.suspended || newStrikes >= 3 };
+              });
+              setPeers((prev) =>
+                prev.map((p) => {
+                  if (p.id === currentUser.id) {
+                    const newStrikes = Math.min((p.strikes || 0) + 1, 3);
+                    return { ...p, strikes: newStrikes, suspended: p.suspended || newStrikes >= 3 };
+                  }
+                  return p;
+                })
+              );
+            }
+          }}
           onStartVideoCall={() => {
             const req = activeChatRequest;
             setActiveChatRequest(null);

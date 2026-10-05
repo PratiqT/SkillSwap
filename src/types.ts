@@ -204,7 +204,39 @@ export interface BadgeDefinition {
 
 // --- Moderation ---
 export type ModerationSeverity = 'low' | 'medium' | 'high' | 'critical';
-export type ModerationStatus = 'pending' | 'reviewed' | 'dismissed' | 'actioned';
+export type ModerationStatus = 'pending' | 'reviewed' | 'dismissed' | 'actioned' | 'escalated';
+export type ModerationCategory =
+  | 'harassment'
+  | 'hate'
+  | 'sexual_inappropriate'
+  | 'threats_violence'
+  | 'bullying'
+  | 'spam'
+  | 'scam_fraud'
+  | 'malicious_links'
+  | 'privacy_violation'
+  | 'impersonation'
+  | 'academic_cheating'
+  | 'credential_theft'
+  | 'financial_scam'
+  | 'other_unsafe'
+  | 'safe';
+
+export type AIRiskLevel = 'SAFE' | 'LOW_RISK' | 'MEDIUM_RISK' | 'HIGH_RISK' | 'CRITICAL';
+export type AIAction = 'allow' | 'warn' | 'review' | 'block';
+
+export interface AIModerationResult {
+  status: 'safe' | 'flagged' | 'blocked';
+  severity: ModerationSeverity;
+  riskLevel: AIRiskLevel;
+  categories: ModerationCategory[];
+  confidence: number;
+  reason: string;
+  action: AIAction;
+  moderatedAt: string;
+  model: string;
+  fallback?: boolean; // true if regex fallback was used
+}
 
 export interface ModerationFlag {
   id: string;
@@ -213,6 +245,7 @@ export interface ModerationFlag {
   userAvatar: string;
   sessionId?: string;
   messageContent: string;
+  contentType: 'chat' | 'bio' | 'skill' | 'credential' | 'review' | 'report' | 'headline';
   category: string;
   severity: ModerationSeverity;
   status: ModerationStatus;
@@ -220,7 +253,85 @@ export interface ModerationFlag {
   createdAt: string;
   reviewedAt?: string;
   reviewedBy?: string;
+  aiResult?: AIModerationResult;
+  reportCount?: number;
+  reports?: ContentReport[];
 }
+
+// --- Content Reporting ---
+export type ReportCategory =
+  | 'harassment'
+  | 'hate'
+  | 'spam'
+  | 'scam'
+  | 'inappropriate_content'
+  | 'threat'
+  | 'privacy_violation'
+  | 'impersonation'
+  | 'academic_cheating'
+  | 'other';
+
+export interface ContentReport {
+  id: string;
+  reporterId: string;
+  reportedUserId: string;
+  reportedUserName: string;
+  contentType: 'chat' | 'bio' | 'skill' | 'credential' | 'review' | 'profile';
+  contentPreview: string;
+  category: ReportCategory;
+  description?: string;
+  timestamp: string;
+  status: 'pending' | 'reviewed' | 'dismissed';
+  caseId?: string; // links to ModerationCase
+}
+
+// --- Moderation Case (escalated) ---
+export type CoordinatorAction =
+  | 'dismiss'
+  | 'warn'
+  | 'remove_content'
+  | 'restrict'
+  | 'suspend'
+  | 'ban'
+  | 'restore';
+
+export interface ModerationCase {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  contentType: 'chat' | 'bio' | 'skill' | 'credential' | 'review' | 'profile';
+  contentPreview: string;
+  aiResult?: AIModerationResult;
+  reportCount: number;
+  reports: ContentReport[];
+  status: 'open' | 'under_review' | 'resolved' | 'dismissed';
+  coordinatorAction?: CoordinatorAction;
+  coordinatorId?: string;
+  coordinatorNote?: string;
+  createdAt: string;
+  resolvedAt?: string;
+  flagId?: string; // linked ModerationFlag if any
+}
+
+// --- Audit Log ---
+export interface AuditLogEntry {
+  id: string;
+  caseId: string;
+  userId: string;
+  contentId?: string;
+  aiResult?: AIModerationResult;
+  reports: ContentReport[];
+  coordinatorAction?: CoordinatorAction;
+  coordinatorId?: string;
+  timestamp: string;
+  reason?: string;
+  previousStatus?: string;
+  newStatus?: string;
+}
+
+// --- User Moderation Status ---
+export type UserModerationStatus = 'active' | 'warned' | 'under_review' | 'restricted' | 'suspended' | 'banned';
 
 // --- Appeals ---
 export interface Appeal {
@@ -229,6 +340,7 @@ export interface Appeal {
   userName: string;
   userAvatar: string;
   flagId: string;
+  caseId?: string;
   reason: string;
   status: 'pending' | 'accepted' | 'rejected';
   submittedAt: string;

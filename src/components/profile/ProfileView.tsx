@@ -93,6 +93,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       <ProfileHeader
         user={user}
         isCurrentUser={isCurrentUser}
+        currentUser={currentUser}
         onEditProfile={onEditProfile}
         onRequestSession={() => onRequestSession?.(user)}
         onOpenChat={() => onOpenChat?.(user)}

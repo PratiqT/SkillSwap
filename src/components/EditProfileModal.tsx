@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { UserProfile } from '../types';
 import { SkillDropdown } from './SkillDropdown';
 import { MITS_BRANCH_CATEGORIES } from '../data/mitsBranches';
-import { X, Plus, Sparkles, Check, Trash2, Award, Camera, Upload } from 'lucide-react';
+import { moderateContent } from '../services/moderationService';
+import { X, Plus, Sparkles, Check, Trash2, Award, Camera, Upload, AlertTriangle } from 'lucide-react';
 
 interface EditProfileModalProps {
   currentUser: UserProfile;
@@ -22,6 +23,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [year, setYear] = useState(currentUser.year || '3rd Year');
   const [skillsOffered, setSkillsOffered] = useState<string[]>([...currentUser.skillsOffered]);
   const [skillsWanted, setSkillsWanted] = useState<string[]>([...currentUser.skillsWanted]);
+  const [isModerating, setIsModerating] = useState(false);
+  const [moderationError, setModerationError] = useState<string | null>(null);
 
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -61,8 +64,35 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setModerationError(null);
+    setIsModerating(true);
+
+    try {
+      if (headline.trim()) {
+        const headlineRes = await moderateContent(headline.trim(), 'headline');
+        if (headlineRes.action === 'block' || headlineRes.status === 'blocked') {
+          setIsModerating(false);
+          setModerationError('Headline contains content that violates platform safety standards.');
+          return;
+        }
+      }
+
+      if (bio.trim()) {
+        const bioRes = await moderateContent(bio.trim(), 'bio');
+        if (bioRes.action === 'block' || bioRes.status === 'blocked') {
+          setIsModerating(false);
+          setModerationError('Bio contains content that violates platform safety standards.');
+          return;
+        }
+      }
+    } catch {
+      // Proceed gracefully
+    } finally {
+      setIsModerating(false);
+    }
+
     onSave({
       avatar,
       headline: headline.trim(),
@@ -335,12 +365,21 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             )}
           </div>
 
+          {/* Moderation Error Alert */}
+          {moderationError && (
+            <div className="flex items-start space-x-2 text-xs text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 p-3 rounded-lg border border-rose-200 dark:border-rose-800">
+              <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+              <span>{moderationError}</span>
+            </div>
+          )}
+
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 dark:bg-teal-600 dark:hover:bg-teal-500 active:scale-[0.99] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+              disabled={isModerating}
+              className="w-full py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 dark:bg-teal-600 dark:hover:bg-teal-500 active:scale-[0.99] text-white text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-50"
             >
-              Save Profile Changes
+              {isModerating ? 'Verifying Safety...' : 'Save Profile Changes'}
             </button>
           </div>
         </form>

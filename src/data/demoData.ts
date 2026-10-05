@@ -427,6 +427,7 @@ export const DEMO_FLAGS: ModerationFlag[] = [
     userAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
     sessionId: undefined,
     messageContent: 'Hey can you send me your password so I can check your code?',
+    contentType: 'chat',
     category: 'Credential Theft',
     severity: 'high',
     status: 'pending',

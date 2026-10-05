@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../../types';
 import { ALL_MITS_BRANCHES } from '../../data/mitsBranches';
+import { ReportButton } from '../ReportButton';
 import {
   CheckCircle2,
   Share2,
@@ -20,6 +21,7 @@ import {
 interface ProfileHeaderProps {
   user: UserProfile;
   isCurrentUser: boolean;
+  currentUser?: UserProfile;
   onEditProfile?: () => void;
   onRequestSession?: () => void;
   onOpenChat?: () => void;
@@ -28,6 +30,7 @@ interface ProfileHeaderProps {
 export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   user,
   isCurrentUser,
+  currentUser,
   onEditProfile,
   onRequestSession,
   onOpenChat,
@@ -163,6 +166,16 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 >
                   {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4" />}
                 </button>
+                {currentUser && (
+                  <ReportButton
+                    reporterId={currentUser.id}
+                    reportedUserId={user.id}
+                    reportedUserName={user.name}
+                    contentType="profile"
+                    contentPreview={`Student Profile: ${user.name} (@${user.username || user.id}) - ${user.headline || user.bio || ''}`}
+                    compact
+                  />
+                )}
               </>
             )}
           </div>

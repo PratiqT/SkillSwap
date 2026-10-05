@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, LearningSession, UserProfile } from '../types';
-import { checkMessage } from '../services/moderationService';
+import { moderateContent, checkMessage, createOrUpdateCaseWithAI } from '../services/moderationService';
+import { ReportButton } from './ReportButton';
 import {
-  X, Send, Smile, ArrowLeft, Paperclip, Video
+  X, Send, Smile, ArrowLeft, Video, Shield, AlertTriangle
 } from 'lucide-react';
 
 interface ChatModuleProps {
@@ -41,6 +42,9 @@ export const ChatModule: React.FC<ChatModuleProps> = ({
   const [text, setText] = useState('');
   const [showEmojis, setShowEmojis] = useState(false);
   const [emojiTab, setEmojiTab] = useState('😊');
+  const [isModerating, setIsModerating] = useState(false);
+  const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
+  const [warnMessage, setWarnMessage] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const actualSession = session || request;
@@ -52,29 +56,103 @@ export const ChatModule: React.FC<ChatModuleProps> = ({
   const peerAvatar = isTrainer
     ? (actualSession?.traineeAvatar || actualSession?.toUserAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150')
     : (actualSession?.trainerAvatar || actualSession?.fromUserAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150');
+  const peerId = isTrainer
+    ? (actualSession?.traineeId || actualSession?.toUserId || '')
+    : (actualSession?.trainerId || actualSession?.fromUserId || '');
   const sessionNumber = actualSession?.sessionNumber ?? 1;
   const sessionSkill = actualSession?.skill || actualSession?.skillWanted || actualSession?.skillOffered || 'Skill Swap';
 
   const handleVideo = onStartVideo || onStartVideoCall || (() => {});
   const handleComplete = onCompleteSession || onClose;
 
+  // Suspended user check
+  const isSuspended = currentUser?.suspended === true;
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed || isModerating || isSuspended) return;
 
-    // Moderation check
-    const result = checkMessage(trimmed);
-    if (result.flagged && onFlagMessage) {
-      onFlagMessage(result.category, result.severity, trimmed);
+    // Dismiss any previous alerts
+    setBlockedMessage(null);
+    setWarnMessage(null);
+
+    // Fast sync regex check first (0ms cost)
+    const syncResult = checkMessage(trimmed);
+
+    if (syncResult.flagged && (syncResult.severity === 'critical' || syncResult.severity === 'high')) {
+      // Immediately block without waiting for AI — obvious violation
+      if (currentUser && onFlagMessage) {
+        onFlagMessage(syncResult.category, syncResult.severity, trimmed);
+      }
+      setBlockedMessage("This message couldn't be sent because it may violate SkillSwap's community guidelines.");
+      setText('');
+      return;
     }
 
-    onSendMessage(trimmed);
-    setText('');
-    setShowEmojis(false);
+    // Use AI moderation for all other messages
+    setIsModerating(true);
+    try {
+      const aiResult = await moderateContent(trimmed, 'chat');
+
+      if (aiResult.action === 'block' || aiResult.status === 'blocked') {
+        // Block the message
+        if (currentUser && onFlagMessage) {
+          onFlagMessage(
+            aiResult.categories[0] || 'policy_violation',
+            aiResult.severity,
+            trimmed
+          );
+          // Create a moderation case
+          createOrUpdateCaseWithAI(
+            currentUser.id,
+            currentUser.name,
+            currentUser.avatar,
+            'chat',
+            trimmed.slice(0, 200),
+            aiResult
+          );
+        }
+        setBlockedMessage("This message couldn't be sent because it may violate SkillSwap's community guidelines.");
+        setText('');
+      } else if (aiResult.action === 'warn') {
+        // Send but warn user
+        if (currentUser && onFlagMessage) {
+          onFlagMessage(
+            aiResult.categories[0] || 'warning',
+            aiResult.severity,
+            trimmed
+          );
+        }
+        onSendMessage(trimmed);
+        setText('');
+        setShowEmojis(false);
+        setWarnMessage('Your message was sent, but it has been flagged for review. Please ensure your messages follow our community guidelines.');
+      } else {
+        // Safe — send normally
+        onSendMessage(trimmed);
+        setText('');
+        setShowEmojis(false);
+      }
+    } catch {
+      // AI check failed — fall back to sync result, allow if not sync-flagged
+      if (syncResult.flagged) {
+        if (currentUser && onFlagMessage) {
+          onFlagMessage(syncResult.category, syncResult.severity, trimmed);
+        }
+        setBlockedMessage("This message couldn't be sent because it may violate SkillSwap's community guidelines.");
+        setText('');
+      } else {
+        onSendMessage(trimmed);
+        setText('');
+        setShowEmojis(false);
+      }
+    } finally {
+      setIsModerating(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -97,11 +175,22 @@ export const ChatModule: React.FC<ChatModuleProps> = ({
             <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">{peerName}</h4>
             <p className="text-[10px] text-slate-500 dark:text-slate-400">
               Session #{sessionNumber} • {sessionSkill} •
-              <span className={isTrainer ? ' text-teal-600 dark:text-teal-400' : ' text-sky-600 dark:text-sky-400'}> {isTrainer ? 'You\'re Teaching' : 'You\'re Learning'}</span>
+              <span className={isTrainer ? ' text-teal-600 dark:text-teal-400' : ' text-sky-600 dark:text-sky-400'}> {isTrainer ? "You're Teaching" : "You're Learning"}</span>
             </p>
           </div>
         </div>
         <div className="flex items-center space-x-1.5">
+          {/* Report button for peer */}
+          {currentUser && peerId && (
+            <ReportButton
+              reporterId={activeUserId}
+              reportedUserId={peerId}
+              reportedUserName={peerName}
+              contentType="chat"
+              contentPreview={messages[messages.length - 1]?.text || 'Chat conversation'}
+              compact
+            />
+          )}
           <button type="button" onClick={handleVideo} className="p-2 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer" title="Start Video">
             <Video className="w-4 h-4" />
           </button>
@@ -111,6 +200,40 @@ export const ChatModule: React.FC<ChatModuleProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Suspended Banner */}
+      {isSuspended && (
+        <div className="bg-rose-600 text-white px-4 py-2.5 flex items-center space-x-2 shrink-0">
+          <Shield className="w-4 h-4 shrink-0" />
+          <p className="text-xs font-semibold">Your account is suspended. You cannot send messages until the coordinator reviews your case.</p>
+        </div>
+      )}
+
+      {/* Blocked Message Alert */}
+      {blockedMessage && (
+        <div className="bg-rose-50 dark:bg-rose-950/40 border-b border-rose-200 dark:border-rose-800 px-4 py-2.5 flex items-start space-x-2 shrink-0">
+          <Shield className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-rose-800 dark:text-rose-300">{blockedMessage}</p>
+          </div>
+          <button type="button" onClick={() => setBlockedMessage(null)} className="text-rose-400 hover:text-rose-600 cursor-pointer">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Warn Message Alert */}
+      {warnMessage && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800 px-4 py-2.5 flex items-start space-x-2 shrink-0">
+          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">{warnMessage}</p>
+          </div>
+          <button type="button" onClick={() => setWarnMessage(null)} className="text-amber-400 hover:text-amber-600 cursor-pointer">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2 bg-gradient-to-b from-slate-50 to-white dark:from-[#07111F] dark:to-[#0D1B2A]">
@@ -166,21 +289,32 @@ export const ChatModule: React.FC<ChatModuleProps> = ({
 
       {/* Input */}
       <div className="border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#0D1B2A] px-3 py-2 flex items-center space-x-2 shrink-0">
-        <button type="button" onClick={() => setShowEmojis(!showEmojis)}
-          className="p-2 text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
-          <Smile className="w-5 h-5" />
-        </button>
+        {!isSuspended && (
+          <button type="button" onClick={() => setShowEmojis(!showEmojis)}
+            className="p-2 text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+            <Smile className="w-5 h-5" />
+          </button>
+        )}
         <input
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type a message..."
-          className="flex-1 px-3 py-2 bg-slate-100 dark:bg-[#122337] rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 border border-transparent dark:border-white/10 outline-none focus:bg-white dark:focus:bg-[#122337] focus:ring-1 focus:ring-sky-500 dark:focus:ring-teal-400"
+          disabled={isSuspended || isModerating}
+          placeholder={isSuspended ? 'Your account is suspended…' : isModerating ? 'Checking message…' : 'Type a message...'}
+          className="flex-1 px-3 py-2 bg-slate-100 dark:bg-[#122337] rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 border border-transparent dark:border-white/10 outline-none focus:bg-white dark:focus:bg-[#122337] focus:ring-1 focus:ring-sky-500 dark:focus:ring-teal-400 disabled:opacity-60"
         />
-        <button type="button" onClick={handleSend} disabled={!text.trim()}
-          className="p-2 bg-sky-600 hover:bg-sky-700 dark:bg-teal-600 dark:hover:bg-teal-500 text-white rounded-xl disabled:bg-slate-300 dark:disabled:bg-slate-700 cursor-pointer transition-colors">
-          <Send className="w-4 h-4" />
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={!text.trim() || isModerating || isSuspended}
+          className="p-2 bg-sky-600 hover:bg-sky-700 dark:bg-teal-600 dark:hover:bg-teal-500 text-white rounded-xl disabled:bg-slate-300 dark:disabled:bg-slate-700 cursor-pointer transition-colors"
+        >
+          {isModerating ? (
+            <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Send className="w-4 h-4" />
+          )}
         </button>
       </div>
     </div>

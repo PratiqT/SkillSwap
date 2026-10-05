@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile, PeerReview } from '../../types';
+import { ReportButton } from '../ReportButton';
 import { Star, CheckCircle2, MessageSquareQuote, Plus } from 'lucide-react';
 
 interface ReviewsSectionProps {
@@ -111,9 +112,21 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                   </div>
                 </div>
 
-                <span className="text-[10px] text-slate-400 font-medium">
-                  {rev.date}
-                </span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    {rev.date}
+                  </span>
+                  {currentUserId && currentUserId !== rev.reviewerId && (
+                    <ReportButton
+                      reporterId={currentUserId}
+                      reportedUserId={rev.reviewerId}
+                      reportedUserName={rev.reviewerName}
+                      contentType="review"
+                      contentPreview={`Review on ${user.name}: "${rev.comment}"`}
+                      compact
+                    />
+                  )}
+                </div>
               </div>
             </div>
           ))}

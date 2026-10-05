@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile, LearningSession } from '../types';
+import { moderateContent } from '../services/moderationService';
 import { Star, AlertTriangle, CheckCircle2, Sparkles, Award } from 'lucide-react';
 
 interface PostSessionFeedbackModalProps {
@@ -22,6 +23,7 @@ export const PostSessionFeedbackModal: React.FC<PostSessionFeedbackModalProps> =
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [moderationError, setModerationError] = useState<string | null>(null);
 
   const actualSession = session || request;
   const isTrainer = (actualSession?.trainerId && actualSession.trainerId === currentUser.id) || (actualSession?.fromUserId === currentUser.id);
@@ -31,9 +33,20 @@ export const PostSessionFeedbackModal: React.FC<PostSessionFeedbackModalProps> =
   const sessionNumber = actualSession?.sessionNumber ?? 1;
   const sessionSkill = actualSession?.skill || actualSession?.skillWanted || actualSession?.skillOffered || 'Skill Swap';
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating < 1) return;
+    setModerationError(null);
+
+    if (comment.trim()) {
+      setIsSubmitting(true);
+      const modResult = await moderateContent(comment.trim(), 'review');
+      if (modResult.action === 'block' || modResult.status === 'blocked') {
+        setIsSubmitting(false);
+        setModerationError("Feedback contains content that violates SkillSwap community standards. Please revise.");
+        return;
+      }
+    }
 
     setIsSubmitting(true);
     setTimeout(() => {
@@ -70,7 +83,7 @@ export const PostSessionFeedbackModal: React.FC<PostSessionFeedbackModalProps> =
             </div>
             <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">Review Submitted!</h4>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Your review has been linked to Session #{session.sessionNumber} with {peerName}.
+              Your review has been linked to Session #{sessionNumber} with {peerName}.
             </p>
           </div>
         ) : (
@@ -114,18 +127,26 @@ export const PostSessionFeedbackModal: React.FC<PostSessionFeedbackModalProps> =
               />
             </div>
 
+            {/* Moderation Error Alert */}
+            {moderationError && (
+              <div className="flex items-start space-x-2 text-xs text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 p-3 rounded-lg border border-rose-200 dark:border-rose-800">
+                <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                <span>{moderationError}</span>
+              </div>
+            )}
+
             {/* Info Note */}
             <div className="flex items-center space-x-2 text-[11px] text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/40 px-3 py-2 rounded-lg border border-teal-200 dark:border-teal-800/60">
               <Sparkles className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
-              <span>This review is permanently linked to Session #{session.sessionNumber} and will contribute to {peerName}'s reputation.</span>
+              <span>This review is permanently linked to Session #{sessionNumber} and will contribute to {peerName}'s reputation.</span>
             </div>
 
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/30 transition-all cursor-pointer"
+              className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/30 transition-all cursor-pointer disabled:opacity-50"
             >
-              Submit Session Review
+              {isSubmitting ? 'Verifying & Submitting...' : 'Submit Session Review'}
             </button>
           </form>
         )}
