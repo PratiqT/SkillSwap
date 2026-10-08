@@ -2,7 +2,7 @@ SkillSwap
 Peer-to-peer skill exchange for students
 
 🌐 Live Demo
-https://github.com/DhuandharCoder/SkillSwap
+
 
 🎯 Problem
 Students have skills they can teach but struggle to
